@@ -19,6 +19,12 @@ CONFIG_DEFAULTS = [
     ("butter_max_days", "5", "Dispatch block: Fresh Butter older than N days"),
     ("fruits_veg_wastage_alert_days", "2", "Days in stock before wastage Sale Alert is created"),
     ("low_stock_pct_threshold", "20", "% of max_stock_level that triggers low-stock alert"),
+    ("po_dairy_evening_grace_time",        "18:20", "Dairy Evening: time draft PO is created (HH:MM, Asia/Kolkata)"),
+    ("po_dairy_evening_fire_time",         "18:30", "Dairy Evening: time draft auto-sends if not edited (HH:MM, Asia/Kolkata)"),
+    ("po_meat_morning_grace_time",         "11:50", "Meat Morning: time draft PO is created (HH:MM, Asia/Kolkata)"),
+    ("po_meat_morning_fire_time",          "12:00", "Meat Morning: time draft auto-sends if not edited (HH:MM, Asia/Kolkata)"),
+    ("po_meat_flowers_evening_grace_time", "18:20", "Meat/Flowers Evening: time draft PO is created (HH:MM, Asia/Kolkata)"),
+    ("po_meat_flowers_evening_fire_time",  "18:30", "Meat/Flowers Evening: time draft auto-sends if not edited (HH:MM, Asia/Kolkata)"),
 ]
 
 FC_ROW = {

@@ -3,13 +3,26 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.database import SessionLocal
-from app.models import DraftPO
+from app.models import DraftPO, SystemConfig
 from app.utils.id_gen import new_id
 from app.utils.time_utils import now
-from app import services as _svc
 
 
 scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
+
+
+# ── Config helpers ────────────────────────────────────────────────────────────
+
+def _read_time(db, key: str, fallback: str) -> tuple[int, int]:
+    """Return (hour, minute) from a HH:MM config key, or fallback if missing/malformed."""
+    row = db.get(SystemConfig, key)
+    raw = row.config_value if row else fallback
+    try:
+        h, m = raw.strip().split(":")
+        return int(h), int(m)
+    except Exception:
+        h, m = fallback.split(":")
+        return int(h), int(m)
 
 
 # ── Grace window creators ────────────────────────────────────────────────────
@@ -80,37 +93,51 @@ def _fire_draft(po_type: str, slot_label: str):
 # ── Job definitions ───────────────────────────────────────────────────────────
 
 def setup_jobs():
-    # Dairy evening: grace at 18:20, fire at 18:30
-    scheduler.add_job(_create_draft, CronTrigger(hour=18, minute=20),
+    db = SessionLocal()
+    try:
+        dairy_g_h,  dairy_g_m  = _read_time(db, "po_dairy_evening_grace_time",        "18:20")
+        dairy_f_h,  dairy_f_m  = _read_time(db, "po_dairy_evening_fire_time",         "18:30")
+        meat_g_h,   meat_g_m   = _read_time(db, "po_meat_morning_grace_time",         "11:50")
+        meat_f_h,   meat_f_m   = _read_time(db, "po_meat_morning_fire_time",          "12:00")
+        mf_g_h,     mf_g_m     = _read_time(db, "po_meat_flowers_evening_grace_time", "18:20")
+        mf_f_h,     mf_f_m     = _read_time(db, "po_meat_flowers_evening_fire_time",  "18:30")
+    finally:
+        db.close()
+
+    # Dairy Evening
+    scheduler.add_job(_create_draft, CronTrigger(hour=dairy_g_h, minute=dairy_g_m),
                       id="dairy_grace_evening", args=["dairy", "evening"],
                       replace_existing=True)
-    scheduler.add_job(_fire_draft, CronTrigger(hour=18, minute=30),
-                      id="dairy_fire_evening", args=["dairy", "evening"],
+    scheduler.add_job(_fire_draft,   CronTrigger(hour=dairy_f_h, minute=dairy_f_m),
+                      id="dairy_fire_evening",  args=["dairy", "evening"],
                       replace_existing=True)
 
-    # Meat morning: grace at 11:50, fire at 12:00
-    scheduler.add_job(_create_draft, CronTrigger(hour=11, minute=50),
-                      id="meat_grace_morning", args=["meat", "morning"],
+    # Meat Morning
+    scheduler.add_job(_create_draft, CronTrigger(hour=meat_g_h, minute=meat_g_m),
+                      id="meat_grace_morning",  args=["meat", "morning"],
                       replace_existing=True)
-    scheduler.add_job(_fire_draft, CronTrigger(hour=12, minute=0),
-                      id="meat_fire_morning", args=["meat", "morning"],
+    scheduler.add_job(_fire_draft,   CronTrigger(hour=meat_f_h, minute=meat_f_m),
+                      id="meat_fire_morning",   args=["meat", "morning"],
                       replace_existing=True)
 
-    # Flowers evening: grace at 18:20, fire at 18:30
-    scheduler.add_job(_create_draft, CronTrigger(hour=18, minute=20),
+    # Meat/Flowers Evening (share the same config slot)
+    scheduler.add_job(_create_draft, CronTrigger(hour=mf_g_h, minute=mf_g_m),
                       id="flowers_grace_evening", args=["flowers", "evening"],
                       replace_existing=True)
-    scheduler.add_job(_fire_draft, CronTrigger(hour=18, minute=30),
-                      id="flowers_fire_evening", args=["flowers", "evening"],
+    scheduler.add_job(_fire_draft,   CronTrigger(hour=mf_f_h, minute=mf_f_m),
+                      id="flowers_fire_evening",  args=["flowers", "evening"],
                       replace_existing=True)
 
-    # Meat evening: grace at 18:20, fire at 18:30
-    scheduler.add_job(_create_draft, CronTrigger(hour=18, minute=20),
-                      id="meat_grace_evening", args=["meat", "evening"],
+    scheduler.add_job(_create_draft, CronTrigger(hour=mf_g_h, minute=mf_g_m),
+                      id="meat_grace_evening",    args=["meat", "evening"],
                       replace_existing=True)
-    scheduler.add_job(_fire_draft, CronTrigger(hour=18, minute=30),
-                      id="meat_fire_evening", args=["meat", "evening"],
+    scheduler.add_job(_fire_draft,   CronTrigger(hour=mf_f_h, minute=mf_f_m),
+                      id="meat_fire_evening",     args=["meat", "evening"],
                       replace_existing=True)
+
+    print(f"[PO Scheduler] Jobs configured: dairy_evening={dairy_g_h:02d}:{dairy_g_m:02d}/{dairy_f_h:02d}:{dairy_f_m:02d} "
+          f"meat_morning={meat_g_h:02d}:{meat_g_m:02d}/{meat_f_h:02d}:{meat_f_m:02d} "
+          f"meat_flowers_evening={mf_g_h:02d}:{mf_g_m:02d}/{mf_f_h:02d}:{mf_f_m:02d}")
 
 
 def get_next_run_times() -> list[dict]:
