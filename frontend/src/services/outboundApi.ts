@@ -86,3 +86,20 @@ export const rejectOutbound = (orderId: string) =>
 
 export const getOutboundLedger = (params: OutboundLedgerParams) =>
   api.get<{ total: number; data: OutboundRow[] }>('/api/outbound/ledger', { params })
+
+// ─── Manual Sales Order ───────────────────────────────────────────────────────
+
+export interface ManualOrderItem {
+  variant_id: string
+  quantity: number
+  unit_price: number
+}
+
+export interface ManualOrderPayload {
+  customer_name: string
+  notes?: string
+  items: ManualOrderItem[]
+}
+
+export const createManualOrder = (payload: ManualOrderPayload) =>
+  api.post<{ order_id: string; status: string; total: number }>('/api/outbound/manual', payload)

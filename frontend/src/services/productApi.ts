@@ -9,6 +9,7 @@ export interface VariantOption {
   sell_before_days: number
   temperature_required: number
   buying_price: number | null
+  base_price: number | null
 }
 
 export interface QuickAddPayload {

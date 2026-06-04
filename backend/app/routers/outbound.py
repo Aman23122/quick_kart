@@ -1,9 +1,10 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, UploadFile, File, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from datetime import date
+from pydantic import BaseModel
 from app.database import get_db
 from app.services.csv_processor import process_outbound_csv
 from app.services.fefo_engine import allocate, preview_allocate
@@ -12,11 +13,91 @@ from app.services.stock_monitor import check_and_alert
 from app.services import notification_service
 from app.models import SalesOrder, OrderLineItem, ProductVariant, Product, Brand
 from app.utils.time_utils import format_ts, now
+from app.utils.id_gen import new_id
 from app.config import settings
 
 router = APIRouter(prefix="/api/outbound", tags=["Outbound"])
 
 FC_ID = settings.FULFILLMENT_CENTER_ID
+
+
+class ManualOrderItem(BaseModel):
+    variant_id: str
+    quantity: int
+    unit_price: float
+
+
+class ManualOrderPayload(BaseModel):
+    customer_name: str
+    notes: Optional[str] = None
+    items: List[ManualOrderItem]
+
+
+@router.post("/manual")
+def create_manual_order(payload: ManualOrderPayload, db: Session = Depends(get_db)):
+    """Create a manual sales order — goes straight to pending_approval."""
+    total = sum(i.quantity * i.unit_price for i in payload.items)
+
+    order = SalesOrder(
+        order_id=new_id(),
+        user_id="WALKIN-CUSTOMER",   # FK placeholder; actual name stored in order_instruction
+        fullfillment_center_id=FC_ID,
+        total_price=round(total, 2),
+        price_without_delivery=round(total, 2),
+        delivery_charge=0,
+        cod_charges=0,
+        payment_status="pending",
+        paid_by_wallet=0,
+        rem_price=0,
+        reserve_amount=0,
+        coupon_discount=0,
+        time_slot_discount=0,
+        dboy_incentive=0,
+        del_partner_tip=0,
+        order_status="pending_approval",
+        cancel_by_store=False,
+        refunded_amount=0,
+        si_payment_flag=False,
+        deduction_amt=0,
+        notify_flag=False,
+        notification_send_end=False,
+        is_subscription=False,
+        repeat_orders=0,
+        trail_discount=0,
+        aft_com_order_dis=0,
+        is_offer_product=False,
+        order_missing_status=False,
+        pastorecentrder=False,
+        order_instruction=payload.customer_name,   # customer name shown in pending panel
+        special_instruction=payload.notes,
+    )
+    db.add(order)
+    db.flush()
+
+    for item in payload.items:
+        variant = db.get(ProductVariant, item.variant_id)
+        line = OrderLineItem(
+            order_line_id=new_id(),
+            order_id=order.order_id,
+            variant_id=item.variant_id,
+            product_id=variant.product_id if variant else None,
+            quantity=item.quantity,
+            unit_price=item.unit_price,
+            total_price=round(item.quantity * item.unit_price, 2),
+            discount=0,
+            discount_per=0,
+            is_subscription_item=False,
+        )
+        db.add(line)
+
+    db.commit()
+
+    notification_service.push(
+        f"New sales order from {payload.customer_name} — {len(payload.items)} item(s) pending approval.",
+        ntype="pending_approval",
+    )
+
+    return {"order_id": order.order_id, "status": order.order_status, "total": float(order.total_price)}
 
 
 @router.post("/upload-csv")
@@ -85,7 +166,7 @@ def get_pending_outbound(db: Session = Depends(get_db)):
 
         result.append({
             "order_id": order.order_id,
-            "user_id": order.user_id,
+            "user_id": order.order_instruction or order.user_id,
             "estimated_total": float(order.total_price or 0),
             "created_at": format_ts(order.created_at),
             "lines": line_details,

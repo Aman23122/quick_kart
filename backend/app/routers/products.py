@@ -44,6 +44,7 @@ def search_variants(q: str = Query(""), db: Session = Depends(get_db)):
             "sell_before_days": variant.sell_before_days,
             "temperature_required": variant.temperature_required,
             "buying_price": float(variant.buying_price) if variant.buying_price else None,
+            "base_price": float(variant.base_price) if variant.base_price else None,
         })
     return result
 
@@ -117,4 +118,5 @@ def quick_add_product(payload: QuickAddPayload, db: Session = Depends(get_db)):
         "sell_before_days": variant.sell_before_days,
         "temperature_required": variant.temperature_required,
         "buying_price": None,
+        "base_price": None,
     }

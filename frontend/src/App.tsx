@@ -4,6 +4,7 @@ import Dashboard from '@/pages/Dashboard'
 import InboundLedger from '@/pages/InboundLedger'
 import InboundEntryPage from '@/pages/InboundEntryPage'
 import OutboundLedger from '@/pages/OutboundLedger'
+import SalesOrderPage from '@/pages/SalesOrderPage'
 import InventoryGrid from '@/pages/InventoryGrid'
 import POMonitor from '@/pages/POMonitor'
 import AlertLog from '@/pages/AlertLog'
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/stock-entry" element={<InboundEntryPage />} />
         <Route path="/inbound" element={<InboundLedger />} />
+        <Route path="/sales-order" element={<SalesOrderPage />} />
         <Route path="/outbound" element={<OutboundLedger />} />
         <Route path="/inventory" element={<InventoryGrid />} />
         <Route path="/po" element={<POMonitor />} />
