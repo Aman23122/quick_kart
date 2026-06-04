@@ -10,7 +10,7 @@ import { submitManualInbound, type UploadResult } from '@/services/inboundApi'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ItemDraft {
+export interface ItemDraft {
   _id: string
   variant_id: string
   variant_label: string
@@ -25,7 +25,7 @@ interface ItemDraft {
   batch_no: string
 }
 
-interface FormDraft {
+export interface FormDraft {
   vendor_id: string
   vendor_invoice_number: string
   expected_receive_date: string
@@ -49,9 +49,9 @@ interface NewProductForm {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DRAFT_KEY = 'qk_inbound_draft'
-const TEMP_THRESHOLD = 8
+export const TEMP_THRESHOLD = 8
 
-const PRODUCT_TYPES = [
+export const PRODUCT_TYPES = [
   { value: 'dairy', label: 'Dairy' },
   { value: 'fresh', label: 'Fresh Produce' },
   { value: 'packaged', label: 'Packaged' },
@@ -60,9 +60,9 @@ const PRODUCT_TYPES = [
   { value: 'other', label: 'Other' },
 ]
 
-const UNIT_OPTIONS = ['kg', 'litre', 'piece', 'pack', 'dozen', 'box', 'gm', 'ml']
+export const UNIT_OPTIONS = ['kg', 'litre', 'piece', 'pack', 'dozen', 'box', 'gm', 'ml']
 
-function emptyItem(): ItemDraft {
+export function emptyItem(): ItemDraft {
   return {
     _id: crypto.randomUUID(),
     variant_id: '',
@@ -100,7 +100,7 @@ function loadDraft(): FormDraft {
 
 // ─── Variant Search Combobox ──────────────────────────────────────────────────
 
-function VariantCombobox({
+export function VariantCombobox({
   value,
   label,
   onSelect,
@@ -214,7 +214,7 @@ function VariantCombobox({
 
 // ─── New Product Modal ────────────────────────────────────────────────────────
 
-function NewProductModal({
+export function NewProductModal({
   onCreated,
   onClose,
 }: {
@@ -371,7 +371,7 @@ function NewProductModal({
 
 // ─── Item Card ────────────────────────────────────────────────────────────────
 
-function ItemCard({
+export function ItemCard({
   item,
   index,
   onChange,

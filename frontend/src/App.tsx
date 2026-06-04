@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '@/components/layout/AppShell'
 import Dashboard from '@/pages/Dashboard'
 import InboundLedger from '@/pages/InboundLedger'
+import InboundEntryPage from '@/pages/InboundEntryPage'
 import OutboundLedger from '@/pages/OutboundLedger'
 import InventoryGrid from '@/pages/InventoryGrid'
 import POMonitor from '@/pages/POMonitor'
@@ -13,6 +14,7 @@ export default function App() {
     <AppShell>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/stock-entry" element={<InboundEntryPage />} />
         <Route path="/inbound" element={<InboundLedger />} />
         <Route path="/outbound" element={<OutboundLedger />} />
         <Route path="/inventory" element={<InventoryGrid />} />

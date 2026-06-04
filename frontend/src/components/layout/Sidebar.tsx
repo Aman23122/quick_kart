@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   PackageCheck,
+  PackagePlus,
   PackageOpen,
   Warehouse,
   ClipboardList,
@@ -13,6 +14,7 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/stock-entry', label: 'Stock Entry', icon: PackagePlus },
   { to: '/inbound', label: 'Inbound', icon: PackageCheck },
   { to: '/outbound', label: 'Outbound', icon: PackageOpen },
   { to: '/inventory', label: 'Inventory', icon: Warehouse },
