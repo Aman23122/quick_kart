@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Loader2, CheckCircle, AlertCircle, PackagePlus, Laptop, Smartphone } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Plus, Loader2, CheckCircle, AlertCircle, PackagePlus, Laptop, Smartphone, Link2 } from 'lucide-react'
 import { getVendorList } from '@/services/vendorApi'
-import { submitManualInbound, type UploadResult } from '@/services/inboundApi'
+import { submitManualInbound, receiveAgainstPO, type UploadResult, type ReceivePOResult } from '@/services/inboundApi'
+import { getOpenPOs, type OpenPO } from '@/services/poApi'
 import {
   ItemCard,
   NewProductModal,
@@ -39,30 +41,145 @@ function loadDraft(): FormDraft {
 const inputCls =
   'w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400'
 
+function POSelectorInputs({
+  openPOs,
+  onSelect,
+}: {
+  openPOs: OpenPO[]
+  onSelect: (po: OpenPO) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const filtered = query.trim()
+    ? openPOs.filter(
+        (p) =>
+          p.po_number.toLowerCase().includes(query.toLowerCase()) ||
+          p.vendor_name.toLowerCase().includes(query.toLowerCase())
+      )
+    : openPOs
+
+  const handleSelect = (po: OpenPO) => {
+    onSelect(po)
+    setQuery('')
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        className={inputCls}
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Type PO number or vendor, or click to browse…"
+        autoComplete="off"
+        spellCheck={false}
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-52 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-slate-400">No matching open POs</p>
+          ) : (
+            filtered.map((po) => (
+              <button
+                key={po.procurement_id}
+                type="button"
+                onMouseDown={() => handleSelect(po)}
+                className="w-full text-left px-3 py-2.5 hover:bg-blue-50 flex items-center justify-between gap-2 border-b border-slate-50 last:border-0"
+              >
+                <div>
+                  <span className="font-mono text-xs font-semibold text-slate-700">{po.po_number}</span>
+                  <span className="text-xs text-slate-500 ml-2">{po.vendor_name}</span>
+                </div>
+                <span className="text-xs text-slate-400 shrink-0">{po.items.length} items</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function InboundEntryPage() {
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<FormDraft>(loadDraft)
   const [showNewProduct, setShowNewProduct] = useState(false)
   const [newProductTargetIdx, setNewProductTargetIdx] = useState<number | null>(null)
-  const [submitResult, setSubmitResult] = useState<UploadResult | null>(null)
+  const [submitResult, setSubmitResult] = useState<UploadResult | ReceivePOResult | null>(null)
   const [mobilePreview, setMobilePreview] = useState(false)
+  const [searchParams] = useSearchParams()
+  const [selectedPO, setSelectedPO] = useState<OpenPO | null>(null)
 
   const { data: vendors } = useQuery({
     queryKey: ['vendor-list'],
     queryFn: () => getVendorList().then((r) => r.data),
   })
 
+  const { data: openPOsData } = useQuery({
+    queryKey: ['open-pos'],
+    queryFn: () => getOpenPOs().then((r) => r.data),
+  })
+  const openPOs: OpenPO[] = openPOsData?.data ?? []
+
+  // Auto-select PO from URL param (?po=procurement_id)
+  useEffect(() => {
+    const poId = searchParams.get('po')
+    if (poId && openPOs.length > 0) {
+      const po = openPOs.find((p) => p.procurement_id === poId)
+      if (po) applyPO(po)
+    }
+  }, [searchParams.get('po'), openPOs.length])
+
   // Persist draft on every change
   useEffect(() => {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
   }, [draft])
 
+  const applyPO = (po: OpenPO) => {
+    setSelectedPO(po)
+    setDraft((d) => ({
+      ...d,
+      vendor_id: po.vendor_id,
+      expected_receive_date: po.expected_receive_date ?? '',
+      expected_receive_time: po.expected_receive_time ?? '',
+      notes: po.notes ?? '',
+      items: po.items.map((item) => ({
+        ...emptyItem(),
+        variant_id: item.variant_id,
+        variant_label: `${item.product_name} — ${item.variant_name}`,
+        sell_before_days: item.sell_before_days,
+        temperature_required: item.temperature_required,
+        unit_cost: String(item.unit_cost),
+        ordered_qty: String(item.ordered_qty),
+        procurement_item_id: item.procurement_item_id,
+        ordered_qty_ref: item.ordered_qty,
+      })),
+    }))
+  }
+
+  const clearPO = () => {
+    setSelectedPO(null)
+    setDraft(defaultDraft())
+  }
+
   const submitMutation = useMutation({
-    mutationFn: submitManualInbound,
+    mutationFn: (vars: { type: 'manual' | 'po'; payload: unknown }) => {
+      if (vars.type === 'po') {
+        const { procurementId, data } = vars.payload as { procurementId: string; data: Parameters<typeof receiveAgainstPO>[1] }
+        return receiveAgainstPO(procurementId, data).then((r) => r.data as UploadResult | ReceivePOResult)
+      }
+      return submitManualInbound(vars.payload as Parameters<typeof submitManualInbound>[0]).then((r) => r.data as UploadResult | ReceivePOResult)
+    },
     onSuccess: (res) => {
-      setSubmitResult(res.data)
+      setSubmitResult(res)
       queryClient.invalidateQueries({ queryKey: ['pending-approvals'] })
       queryClient.invalidateQueries({ queryKey: ['inbound-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['open-pos'] })
+      queryClient.invalidateQueries({ queryKey: ['po-open-monitor'] })
       localStorage.removeItem(DRAFT_KEY)
     },
   })
@@ -86,33 +203,64 @@ export default function InboundEntryPage() {
     e.preventDefault()
     setSubmitResult(null)
     const items = draft.items.filter((it) => it.variant_id && it.sell_before_date)
-    if (!draft.vendor_id || !draft.vendor_invoice_number || items.length === 0) return
+    if (!draft.vendor_invoice_number || items.length === 0) return
 
-    submitMutation.mutate({
-      vendor_id: draft.vendor_id,
-      vendor_invoice_number: parseInt(draft.vendor_invoice_number),
-      expected_receive_date: draft.expected_receive_date || undefined,
-      expected_receive_time: draft.expected_receive_time || undefined,
-      notes: draft.notes || undefined,
-      items: items.map((it) => ({
-        variant_id: it.variant_id,
-        ordered_qty: parseInt(it.ordered_qty) || 0,
-        received_qty: parseInt(it.received_qty) || 0,
-        temperature_measured: parseInt(it.temperature_measured) || 0,
-        unit_cost: parseFloat(it.unit_cost) || 0,
-        expiry_date: it.expiry_date || undefined,
-        sell_before_date: it.sell_before_date,
-        batch_no: it.batch_no || undefined,
-      })),
-    })
+    if (selectedPO) {
+      submitMutation.mutate({
+        type: 'po',
+        payload: {
+          procurementId: selectedPO.procurement_id,
+          data: {
+            vendor_invoice_number: parseInt(draft.vendor_invoice_number),
+            items: items
+              .filter((it) => it.procurement_item_id)
+              .map((it) => ({
+                procurement_item_id: it.procurement_item_id!,
+                received_qty: parseInt(it.received_qty) || 0,
+                temperature_measured: parseInt(it.temperature_measured) || 0,
+                expiry_date: it.expiry_date || undefined,
+                sell_before_date: it.sell_before_date,
+                batch_no: it.batch_no || undefined,
+              })),
+          },
+        },
+      })
+    } else {
+      if (!draft.vendor_id) return
+      submitMutation.mutate({
+        type: 'manual',
+        payload: {
+          vendor_id: draft.vendor_id,
+          vendor_invoice_number: parseInt(draft.vendor_invoice_number),
+          expected_receive_date: draft.expected_receive_date || undefined,
+          expected_receive_time: draft.expected_receive_time || undefined,
+          notes: draft.notes || undefined,
+          items: items.map((it) => ({
+            variant_id: it.variant_id,
+            ordered_qty: parseInt(it.ordered_qty) || 0,
+            received_qty: parseInt(it.received_qty) || 0,
+            temperature_measured: parseInt(it.temperature_measured) || 0,
+            unit_cost: parseFloat(it.unit_cost) || 0,
+            expiry_date: it.expiry_date || undefined,
+            sell_before_date: it.sell_before_date,
+            batch_no: it.batch_no || undefined,
+          })),
+        },
+      })
+    }
   }
 
   const handleNewEntry = () => {
     setDraft(defaultDraft())
     setSubmitResult(null)
+    setSelectedPO(null)
   }
 
-  const hasDraft = draft.vendor_id || draft.items.some((i) => i.variant_id)
+  const hasDraft = draft.vendor_id || selectedPO || draft.items.some((i) => i.variant_id)
+  const canSubmit = !submitMutation.isPending &&
+    !!draft.vendor_invoice_number &&
+    draft.items.some((i) => i.variant_id && i.sell_before_date) &&
+    (selectedPO ? true : !!draft.vendor_id)
 
   // ─── Success screen ───────────────────────────────────────────────────────
 
@@ -210,12 +358,7 @@ export default function InboundEntryPage() {
           {!mobilePreview && (
           <button
             type="submit"
-            disabled={
-              submitMutation.isPending ||
-              !draft.vendor_id ||
-              !draft.vendor_invoice_number ||
-              !draft.items.some((i) => i.variant_id && i.sell_before_date)
-            }
+            disabled={!canSubmit}
             className="hidden sm:flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shrink-0"
           >
             {submitMutation.isPending ? (
@@ -224,6 +367,29 @@ export default function InboundEntryPage() {
               <><CheckCircle size={15} /> Submit for Approval</>
             )}
           </button>
+          )}
+        </div>
+
+        {/* PO Selector */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Link2 size={15} className="text-blue-500" />
+            <p className="text-sm font-semibold text-slate-700">Link to Purchase Order</p>
+            <span className="text-xs text-slate-400">(optional)</span>
+          </div>
+
+          {selectedPO ? (
+            <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div>
+                <p className="text-sm font-semibold text-blue-800 font-mono">{selectedPO.po_number}</p>
+                <p className="text-xs text-blue-600 mt-0.5">{selectedPO.vendor_name} · {selectedPO.items.length} item(s)</p>
+              </div>
+              <button type="button" onClick={clearPO} className="text-xs text-blue-500 hover:text-blue-700 underline">
+                Clear
+              </button>
+            </div>
+          ) : (
+            <POSelectorInputs openPOs={openPOs} onSelect={applyPO} />
           )}
         </div>
 
@@ -248,19 +414,23 @@ export default function InboundEntryPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="text-xs text-slate-600 font-medium mb-1.5 block">Vendor *</label>
-              <select
-                required
-                className={inputCls}
-                value={draft.vendor_id}
-                onChange={(e) => setHeader('vendor_id', e.target.value)}
-              >
-                <option value="">Select vendor…</option>
-                {(vendors ?? []).map((v) => (
-                  <option key={v.vendor_id} value={v.vendor_id}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
+              {selectedPO ? (
+                <div className={`${inputCls} bg-slate-50 text-slate-600 cursor-not-allowed`}>
+                  {selectedPO.vendor_name}
+                </div>
+              ) : (
+                <select
+                  required
+                  className={inputCls}
+                  value={draft.vendor_id}
+                  onChange={(e) => setHeader('vendor_id', e.target.value)}
+                >
+                  <option value="">Select vendor…</option>
+                  {(vendors ?? []).map((v) => (
+                    <option key={v.vendor_id} value={v.vendor_id}>{v.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
@@ -356,12 +526,7 @@ export default function InboundEntryPage() {
         <div className="pb-6">
           <button
             type="submit"
-            disabled={
-              submitMutation.isPending ||
-              !draft.vendor_id ||
-              !draft.vendor_invoice_number ||
-              !draft.items.some((i) => i.variant_id && i.sell_before_date)
-            }
+            disabled={!canSubmit}
             className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {submitMutation.isPending ? (

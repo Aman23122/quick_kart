@@ -8,7 +8,7 @@ class Procurement(Base):
     procurement_id = Column(String(36), primary_key=True)
     vendor_id = Column(String(36), nullable=False)
     fulfillment_center_id = Column(String(36), nullable=False)
-    vendor_invoice_number = Column(BigInteger, nullable=False)
+    vendor_invoice_number = Column(BigInteger, nullable=True)
     po_number = Column(String(100), nullable=True, unique=True)
     status = Column(String(50), nullable=False, default="draft")
     total_amount = Column(Numeric(14, 2), nullable=True)

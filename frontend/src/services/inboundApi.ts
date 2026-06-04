@@ -104,3 +104,29 @@ export interface ManualInboundPayload {
 
 export const submitManualInbound = (payload: ManualInboundPayload) =>
   api.post<UploadResult>('/api/inbound/manual', payload)
+
+export interface ReceiveItemDetail {
+  procurement_item_id: string
+  received_qty: number
+  temperature_measured: number
+  expiry_date?: string
+  sell_before_date: string
+  batch_no?: string
+}
+
+export interface ReceivePOPayload {
+  vendor_invoice_number: number
+  items: ReceiveItemDetail[]
+}
+
+export interface ReceivePOResult {
+  procurement_id: string
+  po_number: string
+  status: string
+  passed: number
+  failed: number
+  rows: { procurement_item_id: string; variant_id: string; status: string; reason: string }[]
+}
+
+export const receiveAgainstPO = (procurementId: string, payload: ReceivePOPayload) =>
+  api.post<ReceivePOResult>(`/api/inbound/receive/${procurementId}`, payload)

@@ -16,6 +16,7 @@ def _run_migrations():
     """Add new nullable columns to existing tables without dropping data."""
     migrations = [
         "ALTER TABLE procurement ADD COLUMN expected_receive_time VARCHAR(5) NULL",
+        "ALTER TABLE procurement MODIFY COLUMN vendor_invoice_number BIGINT NULL",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

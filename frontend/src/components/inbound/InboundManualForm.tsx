@@ -23,6 +23,8 @@ export interface ItemDraft {
   expiry_date: string
   sell_before_date: string
   batch_no: string
+  procurement_item_id?: string  // set when linked to a PO
+  ordered_qty_ref?: number       // reference qty from PO
 }
 
 export interface FormDraft {

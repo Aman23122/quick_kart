@@ -16,6 +16,20 @@ from app.utils.id_gen import new_id
 from app.config import settings
 
 
+class ReceiveItemDetail(BaseModel):
+    procurement_item_id: str
+    received_qty: int
+    temperature_measured: int
+    expiry_date: Optional[str] = None
+    sell_before_date: str
+    batch_no: Optional[str] = None
+
+
+class ReceivePOPayload(BaseModel):
+    vendor_invoice_number: int
+    items: List[ReceiveItemDetail]
+
+
 class ManualInboundItem(BaseModel):
     variant_id: str
     ordered_qty: int
@@ -229,6 +243,85 @@ def get_inbound_ledger(
         })
 
     return {"total": total, "data": result}
+
+
+@router.post("/receive/{procurement_id}")
+def receive_against_po(procurement_id: str, payload: ReceivePOPayload, db: Session = Depends(get_db)):
+    """Receive stock against an existing draft/sent PO — runs QC, sets pending_approval."""
+    proc = db.get(Procurement, procurement_id)
+    if not proc:
+        raise HTTPException(404, "PO not found")
+    if proc.status not in ("draft", "sent"):
+        raise HTTPException(400, f"Cannot receive — PO status is '{proc.status}'")
+
+    proc.vendor_invoice_number = payload.vendor_invoice_number
+    passed = 0
+    failed = 0
+    rows = []
+
+    for receive in payload.items:
+        item = db.get(ProcurementItem, receive.procurement_item_id)
+        if not item or item.procurement_id != procurement_id:
+            rows.append({"procurement_item_id": receive.procurement_item_id, "status": "error", "reason": "Item not found"})
+            continue
+
+        qc = validate_inbound(db, item.variant_id, receive.temperature_measured)
+
+        expiry = None
+        if receive.expiry_date:
+            try:
+                expiry = datetime.strptime(receive.expiry_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
+        try:
+            sell_before = datetime.strptime(receive.sell_before_date, "%Y-%m-%d").date()
+        except ValueError:
+            rows.append({"procurement_item_id": receive.procurement_item_id, "status": "error", "reason": "Invalid sell_before_date"})
+            continue
+
+        item.received_qty = receive.received_qty
+        item.temperature_measured = receive.temperature_measured
+        item.expiry_date = expiry
+        item.sell_before_date = sell_before
+        item.batch_no = receive.batch_no
+        item.total_cost = item.received_qty * float(item.unit_cost)
+
+        if qc.passed:
+            passed += 1
+        else:
+            failed += 1
+
+        rows.append({
+            "procurement_item_id": receive.procurement_item_id,
+            "variant_id": item.variant_id,
+            "status": "passed" if qc.passed else "failed",
+            "reason": qc.reason,
+        })
+
+    proc.status = "pending_approval" if passed > 0 else "rejected"
+    proc.updated_at = now()
+    db.commit()
+
+    if passed > 0:
+        notification_service.push(
+            f"PO {proc.po_number} received — {passed} item(s) pending approval.",
+            ntype="pending_approval",
+        )
+    if failed > 0:
+        notification_service.push(
+            f"{failed} item(s) from PO {proc.po_number} failed QC.",
+            ntype="inbound_rejected",
+        )
+
+    return {
+        "procurement_id": procurement_id,
+        "po_number": proc.po_number,
+        "status": proc.status,
+        "passed": passed,
+        "failed": failed,
+        "rows": rows,
+    }
 
 
 @router.post("/manual")
