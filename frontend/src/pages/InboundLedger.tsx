@@ -50,14 +50,34 @@ const ledgerColumns: ColumnDef<InboundRow>[] = [
       if (r.on_time === null || r.on_time === undefined) {
         return <span className="text-slate-300 text-xs">—</span>
       }
+      const diff = r.on_time_diff_minutes as number | null | undefined
+      const diffLabel = (() => {
+        if (diff == null) return null
+        const abs = Math.abs(diff)
+        if (abs < 60) return `${abs}m`
+        if (abs < 1440) {
+          const h = Math.floor(abs / 60)
+          const m = abs % 60
+          return m > 0 ? `${h}h ${m}m` : `${h}h`
+        }
+        const d = Math.floor(abs / 1440)
+        const h = Math.floor((abs % 1440) / 60)
+        return h > 0 ? `${d}d ${h}h` : `${d}d`
+      })()
       return r.on_time ? (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700">
-          <Timer size={11} /> On Time
-        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 w-fit">
+            <Timer size={11} /> On Time
+          </span>
+          {diffLabel && <span className="text-xs text-emerald-600 pl-1">{diffLabel} early</span>}
+        </div>
       ) : (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-rose-50 text-rose-700">
-          <Timer size={11} /> Late
-        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 w-fit">
+            <Timer size={11} /> Late
+          </span>
+          {diffLabel && <span className="text-xs text-rose-600 pl-1">{diffLabel}</span>}
+        </div>
       )
     },
   },

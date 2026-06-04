@@ -113,6 +113,8 @@ export default function InboundEntryPage() {
   const [mobilePreview, setMobilePreview] = useState(false)
   const [searchParams] = useSearchParams()
   const [selectedPO, setSelectedPO] = useState<OpenPO | null>(null)
+  const [actualDate, setActualDate] = useState('')
+  const [actualTime, setActualTime] = useState('')
 
   const { data: vendors } = useQuery({
     queryKey: ['vendor-list'],
@@ -164,6 +166,8 @@ export default function InboundEntryPage() {
   const clearPO = () => {
     setSelectedPO(null)
     setDraft(defaultDraft())
+    setActualDate('')
+    setActualTime('')
   }
 
   const submitMutation = useMutation({
@@ -212,6 +216,8 @@ export default function InboundEntryPage() {
           procurementId: selectedPO.procurement_id,
           data: {
             vendor_invoice_number: parseInt(draft.vendor_invoice_number),
+            actual_receive_date: actualDate || undefined,
+            actual_receive_time: actualTime || undefined,
             items: items
               .filter((it) => it.procurement_item_id)
               .map((it) => ({
@@ -445,31 +451,77 @@ export default function InboundEntryPage() {
               />
             </div>
 
-            <div>
-              <label className="text-xs text-slate-600 font-medium mb-1.5 block">
-                Expected Date
-                <span className="ml-1 font-normal text-slate-400">(optional)</span>
-              </label>
-              <div className="flex flex-col gap-2">
-                <input
-                  type="date"
-                  className={inputCls}
-                  value={draft.expected_receive_date}
-                  onChange={(e) => setHeader('expected_receive_date', e.target.value)}
-                />
-                <input
-                  type="time"
-                  className={inputCls}
-                  value={draft.expected_receive_time}
-                  onChange={(e) => setHeader('expected_receive_time', e.target.value)}
-                  disabled={!draft.expected_receive_date}
-                  title="Expected arrival time"
-                />
-                {draft.expected_receive_date && !draft.expected_receive_time && (
-                  <p className="text-xs text-slate-400">No time = end of day (23:59) assumed</p>
-                )}
+            {selectedPO ? (
+              <>
+                {/* Read-only expected date/time from PO */}
+                <div>
+                  <label className="text-xs text-slate-600 font-medium mb-1.5 block">
+                    Expected Date
+                    <span className="ml-1.5 text-xs font-normal text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">from PO</span>
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <div className={`${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed`}>
+                      {selectedPO.expected_receive_date ?? '—'}
+                    </div>
+                    <div className={`${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed`}>
+                      {selectedPO.expected_receive_time ?? '—'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Editable actual received date/time */}
+                <div>
+                  <label className="text-xs text-slate-600 font-medium mb-1.5 block">
+                    Actual Received Date &amp; Time
+                    <span className="ml-1 font-normal text-slate-400">(optional)</span>
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="date"
+                      className={inputCls}
+                      value={actualDate}
+                      onChange={(e) => setActualDate(e.target.value)}
+                    />
+                    <input
+                      type="time"
+                      className={inputCls}
+                      value={actualTime}
+                      onChange={(e) => setActualTime(e.target.value)}
+                      disabled={!actualDate}
+                    />
+                    {actualDate && !actualTime && (
+                      <p className="text-xs text-slate-400">No time = end of day (23:59) assumed</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className="text-xs text-slate-600 font-medium mb-1.5 block">
+                  Expected Date
+                  <span className="ml-1 font-normal text-slate-400">(optional)</span>
+                </label>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={draft.expected_receive_date}
+                    onChange={(e) => setHeader('expected_receive_date', e.target.value)}
+                  />
+                  <input
+                    type="time"
+                    className={inputCls}
+                    value={draft.expected_receive_time}
+                    onChange={(e) => setHeader('expected_receive_time', e.target.value)}
+                    disabled={!draft.expected_receive_date}
+                    title="Expected arrival time"
+                  />
+                  {draft.expected_receive_date && !draft.expected_receive_time && (
+                    <p className="text-xs text-slate-400">No time = end of day (23:59) assumed</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="sm:col-span-2">
               <label className="text-xs text-slate-600 font-medium mb-1.5 block">Notes</label>

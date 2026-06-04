@@ -27,6 +27,8 @@ class ReceiveItemDetail(BaseModel):
 
 class ReceivePOPayload(BaseModel):
     vendor_invoice_number: int
+    actual_receive_date: Optional[str] = None   # "YYYY-MM-DD"
+    actual_receive_time: Optional[str] = None   # "HH:MM"
     items: List[ReceiveItemDetail]
 
 
@@ -207,9 +209,10 @@ def get_inbound_ledger(
         variant = db.get(ProductVariant, item.variant_id)
         vendor = db.get(Vendor, proc.vendor_id)
 
-        # Compute on_time: compare created_at vs expected date+time
+        # Compute on_time and diff: compare actual received datetime vs expected datetime
         on_time = None
-        if proc.expected_receive_date and proc.created_at:
+        on_time_diff_minutes = None
+        if proc.expected_receive_date:
             exp_time = dt_time(23, 59)
             if proc.expected_receive_time:
                 try:
@@ -218,7 +221,21 @@ def get_inbound_ledger(
                 except ValueError:
                     pass
             expected_dt = datetime.combine(proc.expected_receive_date, exp_time)
-            on_time = proc.created_at <= expected_dt
+
+            # Use actual received date/time if available, else fall back to created_at
+            actual_date = proc.actual_received_date or (proc.created_at.date() if proc.created_at else None)
+            if actual_date:
+                actual_time = dt_time(23, 59)
+                if proc.actual_received_time:
+                    try:
+                        h, m = proc.actual_received_time.split(":")
+                        actual_time = dt_time(int(h), int(m))
+                    except ValueError:
+                        pass
+                actual_dt = datetime.combine(actual_date, actual_time)
+                on_time = actual_dt <= expected_dt
+                # positive = early (arrived before expected), negative = late
+                on_time_diff_minutes = int((expected_dt - actual_dt).total_seconds() / 60)
 
         result.append({
             "procurement_id": proc.procurement_id,
@@ -238,6 +255,7 @@ def get_inbound_ledger(
             "expected_receive_date": str(proc.expected_receive_date) if proc.expected_receive_date else None,
             "expected_receive_time": proc.expected_receive_time,
             "on_time": on_time,
+            "on_time_diff_minutes": on_time_diff_minutes,
             "status": proc.status,
             "created_at": format_ts(proc.created_at),
         })
@@ -255,6 +273,12 @@ def receive_against_po(procurement_id: str, payload: ReceivePOPayload, db: Sessi
         raise HTTPException(400, f"Cannot receive — PO status is '{proc.status}'")
 
     proc.vendor_invoice_number = payload.vendor_invoice_number
+    if payload.actual_receive_date:
+        try:
+            proc.actual_received_date = datetime.strptime(payload.actual_receive_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    proc.actual_received_time = payload.actual_receive_time or None
     passed = 0
     failed = 0
     rows = []

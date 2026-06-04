@@ -15,6 +15,7 @@ class Procurement(Base):
     expected_receive_date = Column(Date, nullable=True)
     expected_receive_time = Column(String(5), nullable=True)  # "HH:MM"
     actual_received_date = Column(Date, nullable=True)
+    actual_received_time = Column(String(5), nullable=True)  # "HH:MM"
     notes = Column(Text, nullable=True)
     created_by = Column(String(36), nullable=True)
     approved_by = Column(String(36), nullable=True)

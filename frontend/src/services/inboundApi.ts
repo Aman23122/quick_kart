@@ -18,6 +18,7 @@ export interface InboundRow {
   expected_receive_date?: string | null
   expected_receive_time?: string | null
   on_time?: boolean | null
+  on_time_diff_minutes?: number | null
   status?: string
   created_at?: string
   [key: string]: unknown
@@ -116,6 +117,8 @@ export interface ReceiveItemDetail {
 
 export interface ReceivePOPayload {
   vendor_invoice_number: number
+  actual_receive_date?: string
+  actual_receive_time?: string
   items: ReceiveItemDetail[]
 }
 
