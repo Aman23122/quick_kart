@@ -12,6 +12,9 @@ frontend/dist/
 frontend/.env
 frontend/.env.local
 
+# Sample / test CSVs
+frontend/public/sample_csvs/
+
 # OS
 .DS_Store
 Thumbs.db
