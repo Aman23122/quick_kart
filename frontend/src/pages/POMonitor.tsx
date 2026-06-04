@@ -203,7 +203,7 @@ export default function POMonitor() {
   const { data: scheduleData } = useQuery({
     queryKey: ['po-schedule'],
     queryFn: () => getSchedule().then((r) => r.data),
-    refetchInterval: 30_000,
+    refetchInterval: 5_000,
   })
 
   const templateQueries = SCHEDULE_SLOTS.map((slot) =>

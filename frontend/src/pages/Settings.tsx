@@ -166,8 +166,11 @@ export default function Settings() {
   const saveMutation = useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>
       updateConfig(key, value),
-    onSuccess: () => {
+    onSuccess: (_, { key }) => {
       queryClient.invalidateQueries({ queryKey: ['config'] })
+      if (key.startsWith('po_')) {
+        queryClient.invalidateQueries({ queryKey: ['po-schedule'] })
+      }
       setSavingKey(null)
     },
     onError: () => {
