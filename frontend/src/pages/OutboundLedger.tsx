@@ -225,6 +225,8 @@ function PendingOutboundPanel() {
         <div className="divide-y divide-slate-100">
           {orders.map((order) => {
             const isBusy = approveMutation.isPending || rejectMutation.isPending
+            const cannotFulfill = order.lines.some((l) => !l.fefo_preview.fulfilled)
+            const noStock = order.lines.every((l) => l.fefo_preview.qty_fulfilled === 0)
             return (
               <div key={order.order_id} className="p-5 space-y-3">
                 {/* Order header */}
@@ -234,20 +236,27 @@ function PendingOutboundPanel() {
                       <span className="font-mono text-sm text-slate-700">{order.order_id.slice(0, 16)}…</span>
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">
-                      User: {order.user_id} &nbsp;·&nbsp; {order.created_at}
+                      Customer: {order.user_id} &nbsp;·&nbsp; {order.created_at}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-sm text-slate-500 mr-2">
                       Est. {formatCurrency(order.estimated_total)}
                     </span>
-                    <button
-                      disabled={isBusy}
-                      onClick={() => approveMutation.mutate(order.order_id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
-                    >
-                      <CheckCircle size={13} /> Approve & Dispatch
-                    </button>
+                    <div className="flex flex-col items-end gap-1">
+                      <button
+                        disabled={isBusy || cannotFulfill}
+                        onClick={() => approveMutation.mutate(order.order_id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <CheckCircle size={13} /> Approve & Dispatch
+                      </button>
+                      {cannotFulfill && (
+                        <span className="text-xs text-rose-500 font-medium">
+                          {noStock ? 'No stock available' : 'Insufficient stock'}
+                        </span>
+                      )}
+                    </div>
                     <button
                       disabled={isBusy}
                       onClick={() => rejectMutation.mutate(order.order_id)}
