@@ -1,32 +1,42 @@
 import api from '@/lib/axios'
-import { type DraftPO } from '@/components/po/DraftPOCard'
-
-export interface DraftListParams {
-  status?: string
-}
-
-export interface DraftUpdateData {
-  line_items: Array<{ product: string; qty: number; unit: string }>
-  notes: string
-  status?: string
-}
 
 export interface ScheduleJob {
   job_id: string
   next_run: string
 }
 
-export const listDrafts = (params: DraftListParams) =>
-  api.get<{ total: number; data: DraftPO[] }>('/api/po/drafts', { params })
-
-export const updateDraft = (draftId: string, data: DraftUpdateData) =>
-  api.patch<DraftPO>(`/api/po/draft/${draftId}`, data)
-
-export const triggerPO = (po_type: string, slot_label: string) =>
-  api.post('/api/po/trigger', null, { params: { po_type, slot_label } })
-
 export const getSchedule = () =>
   api.get<{ jobs: ScheduleJob[] }>('/api/po/schedule')
+
+// ─── Scheduled PO Template ────────────────────────────────────────────────────
+
+export interface TemplateItem {
+  variant_id: string
+  product_name: string
+  variant_name: string
+  ordered_qty: number
+  unit_cost: number
+}
+
+export interface POTemplate {
+  slot_id: string
+  vendor_id: string
+  vendor_name: string
+  notes: string
+  items: TemplateItem[]
+}
+
+export interface TemplateUpdatePayload {
+  vendor_id?: string
+  notes?: string
+  items?: Array<{ variant_id: string; ordered_qty: number; unit_cost: number }>
+}
+
+export const getTemplate = (slotId: string) =>
+  api.get<POTemplate>(`/api/po/template/${slotId}`)
+
+export const updateTemplate = (slotId: string, data: TemplateUpdatePayload) =>
+  api.put<{ status: string }>(`/api/po/template/${slotId}`, data)
 
 // ─── Manual PO ───────────────────────────────────────────────────────────────
 

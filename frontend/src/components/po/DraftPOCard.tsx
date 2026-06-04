@@ -1,6 +1,5 @@
-import { Calendar, Clock, Edit3, Package } from 'lucide-react'
+import { Clock, Edit3, Package } from 'lucide-react'
 import StatusBadge from '@/components/shared/StatusBadge'
-import CountdownTimer from './CountdownTimer'
 import { formatTs } from '@/lib/utils'
 
 export interface DraftPO {
@@ -43,28 +42,10 @@ export default function DraftPOCard({ draft, onEdit }: DraftPOCardProps) {
         <StatusBadge status={draft.status} />
       </div>
 
-      {/* Times */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex items-start gap-2">
-          <Calendar size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-xs text-slate-400">Grace starts</p>
-            <p className="text-xs font-medium text-slate-600 mt-0.5">{formatTs(draft.grace_starts_at)}</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-2">
-          <Clock size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-xs text-slate-400">Scheduled fire</p>
-            <p className="text-xs font-medium text-slate-600 mt-0.5">{formatTs(draft.scheduled_fire_at)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Countdown */}
+      {/* Created at */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-500">Fires in:</span>
-        <CountdownTimer targetTime={draft.scheduled_fire_at} />
+        <Clock size={13} className="text-slate-400 flex-shrink-0" />
+        <span className="text-xs text-slate-500">Created: {formatTs(draft.created_at)}</span>
       </div>
 
       {/* Line items summary */}

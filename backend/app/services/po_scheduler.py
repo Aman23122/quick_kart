@@ -1,20 +1,32 @@
-"""APScheduler-based PO grace-window scheduler."""
-from datetime import datetime, timedelta
+"""APScheduler-based scheduled PO scheduler.
+
+When the configured time fires, reads the slot's template and creates a real
+Procurement PO (status=sent) directly — no grace window, no draft step.
+
+Expected receive date logic:
+  00:00–03:59  → same calendar day, 10:00
+  04:00–23:59  → next calendar day, 10:00
+"""
+from datetime import datetime, timedelta, time as dtime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.database import SessionLocal
-from app.models import DraftPO, SystemConfig
+from app.models import (
+    ScheduledPOTemplate, Procurement, ProcurementItem,
+    Vendor, ProductVariant, Product, SystemConfig,
+)
 from app.utils.id_gen import new_id
 from app.utils.time_utils import now
+from app.config import settings
 
+FC_ID = settings.FULFILLMENT_CENTER_ID
 
 scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
 
 
-# ── Config helpers ────────────────────────────────────────────────────────────
+# ── Config helper ─────────────────────────────────────────────────────────────
 
 def _read_time(db, key: str, fallback: str) -> tuple[int, int]:
-    """Return (hour, minute) from a HH:MM config key, or fallback if missing/malformed."""
     row = db.get(SystemConfig, key)
     raw = row.config_value if row else fallback
     try:
@@ -25,123 +37,107 @@ def _read_time(db, key: str, fallback: str) -> tuple[int, int]:
         return int(h), int(m)
 
 
-# ── Grace window creators ────────────────────────────────────────────────────
+# ── Core job ──────────────────────────────────────────────────────────────────
 
-def _create_draft(po_type: str, slot_label: str, fire_in_minutes: int = 10):
+def _fire_scheduled_po(slot_id: str):
     db = SessionLocal()
     try:
-        grace_time = now()
-        fire_time = grace_time + timedelta(minutes=fire_in_minutes)
+        tmpl = db.get(ScheduledPOTemplate, slot_id)
+        if not tmpl or not tmpl.vendor_id or not tmpl.items:
+            print(f"[PO Scheduler] No template / empty template for '{slot_id}', skipping")
+            return
 
-        draft = DraftPO(
-            draft_id=new_id(),
-            po_type=po_type,
-            slot_label=slot_label,
-            scheduled_fire_at=fire_time,
-            grace_starts_at=grace_time,
-            status="draft",
-            line_items=[],
-            created_at=grace_time,
+        fire_time = now()
+
+        # Expected receive date
+        t = fire_time.time()
+        if dtime(0, 0) <= t < dtime(4, 0):
+            recv_date = fire_time.date()
+        else:
+            recv_date = fire_time.date() + timedelta(days=1)
+        recv_time_str = "10:00"
+
+        total_amount = sum(i["ordered_qty"] * i["unit_cost"] for i in tmpl.items)
+
+        proc_id = new_id()
+        po_number = f"SPO-{proc_id[:8].upper()}"
+
+        proc = Procurement(
+            procurement_id=proc_id,
+            vendor_id=tmpl.vendor_id,
+            fulfillment_center_id=FC_ID,
+            po_number=po_number,
+            status="sent",
+            total_amount=total_amount,
+            expected_receive_date=recv_date,
+            expected_receive_time=recv_time_str,
+            notes=tmpl.notes or None,
+            created_at=fire_time,
+            updated_at=fire_time,
         )
-        db.add(draft)
+        db.add(proc)
+        db.flush()
+
+        item_summaries = []
+        for it in tmpl.items:
+            variant = db.get(ProductVariant, it["variant_id"])
+            product = db.get(Product, variant.product_id) if variant else None
+            sell_before = fire_time.date() + timedelta(days=variant.sell_before_days if variant else 7)
+
+            db.add(ProcurementItem(
+                procurement_item_id=new_id(),
+                procurement_id=proc_id,
+                variant_id=it["variant_id"],
+                ordered_qty=it["ordered_qty"],
+                received_qty=0,
+                temperature_measured=variant.temperature_required if variant else 0,
+                unit_cost=it["unit_cost"],
+                total_cost=it["ordered_qty"] * it["unit_cost"],
+                sell_before_date=sell_before,
+            ))
+
+            p_name = product.product_name if product else it["variant_id"]
+            v_name = variant.variant_name if variant else ""
+            label = f"{p_name} — {v_name}" if v_name else p_name
+            item_summaries.append(f"{label} ×{it['ordered_qty']} @ ₹{it['unit_cost']}")
+
         db.commit()
-        db.refresh(draft)
+
+        vendor = db.get(Vendor, tmpl.vendor_id)
+        vendor_name = vendor.name if vendor else tmpl.vendor_id
+        recv_str = f"{recv_date.strftime('%d %b')} 10:00 AM"
 
         from app.services import notification_service
         notification_service.push(
-            message=(
-                f"Grace window OPEN: {po_type.upper()} {slot_label} Draft PO created. "
-                f"You have 10 minutes to review before auto-send."
-            ),
-            ntype="po_draft_ready",
-            extra={"draft_id": draft.draft_id, "fire_at": str(fire_time)},
+            message=f"PO Auto-Sent → {vendor_name} | {', '.join(item_summaries)} | Delivery: {recv_str}",
+            ntype="po_sent",
+            extra={"procurement_id": proc_id, "po_number": po_number},
         )
-        print(f"[PO Scheduler] Draft PO created: {po_type} / {slot_label} → fires at {fire_time}")
+        print(f"[PO Scheduler] Auto-sent {po_number} → {vendor_name} ({slot_id})")
     finally:
         db.close()
 
 
-def _fire_draft(po_type: str, slot_label: str):
-    """Auto-send drafts that are still in 'draft' status."""
-    db = SessionLocal()
-    try:
-        pending = (
-            db.query(DraftPO)
-            .filter(
-                DraftPO.po_type == po_type,
-                DraftPO.slot_label == slot_label,
-                DraftPO.status == "draft",
-            )
-            .all()
-        )
-        for draft in pending:
-            draft.status = "sent"
-            print(f"[PO Scheduler] Auto-sent draft {draft.draft_id} ({po_type}/{slot_label})")
-
-        db.commit()
-
-        if pending:
-            from app.services import notification_service
-            notification_service.push(
-                message=f"PO auto-sent: {po_type.upper()} {slot_label} — {len(pending)} draft(s) dispatched.",
-                ntype="po_sent",
-            )
-    finally:
-        db.close()
-
-
-# ── Job definitions ───────────────────────────────────────────────────────────
+# ── Setup ─────────────────────────────────────────────────────────────────────
 
 def setup_jobs():
     db = SessionLocal()
     try:
-        dairy_g_h,  dairy_g_m  = _read_time(db, "po_dairy_evening_grace_time",        "18:20")
-        dairy_f_h,  dairy_f_m  = _read_time(db, "po_dairy_evening_fire_time",         "18:30")
-        meat_g_h,   meat_g_m   = _read_time(db, "po_meat_morning_grace_time",         "11:50")
-        meat_f_h,   meat_f_m   = _read_time(db, "po_meat_morning_fire_time",          "12:00")
-        mf_g_h,     mf_g_m     = _read_time(db, "po_meat_flowers_evening_grace_time", "18:20")
-        mf_f_h,     mf_f_m     = _read_time(db, "po_meat_flowers_evening_fire_time",  "18:30")
+        dairy_h, dairy_m = _read_time(db, "po_dairy_evening_grace_time", "18:20")
     finally:
         db.close()
 
-    # Dairy Evening
-    scheduler.add_job(_create_draft, CronTrigger(hour=dairy_g_h, minute=dairy_g_m),
-                      id="dairy_grace_evening", args=["dairy", "evening"],
-                      replace_existing=True)
-    scheduler.add_job(_fire_draft,   CronTrigger(hour=dairy_f_h, minute=dairy_f_m),
-                      id="dairy_fire_evening",  args=["dairy", "evening"],
-                      replace_existing=True)
-
-    # Meat Morning
-    scheduler.add_job(_create_draft, CronTrigger(hour=meat_g_h, minute=meat_g_m),
-                      id="meat_grace_morning",  args=["meat", "morning"],
-                      replace_existing=True)
-    scheduler.add_job(_fire_draft,   CronTrigger(hour=meat_f_h, minute=meat_f_m),
-                      id="meat_fire_morning",   args=["meat", "morning"],
-                      replace_existing=True)
-
-    # Meat/Flowers Evening (share the same config slot)
-    scheduler.add_job(_create_draft, CronTrigger(hour=mf_g_h, minute=mf_g_m),
-                      id="flowers_grace_evening", args=["flowers", "evening"],
-                      replace_existing=True)
-    scheduler.add_job(_fire_draft,   CronTrigger(hour=mf_f_h, minute=mf_f_m),
-                      id="flowers_fire_evening",  args=["flowers", "evening"],
-                      replace_existing=True)
-
-    scheduler.add_job(_create_draft, CronTrigger(hour=mf_g_h, minute=mf_g_m),
-                      id="meat_grace_evening",    args=["meat", "evening"],
-                      replace_existing=True)
-    scheduler.add_job(_fire_draft,   CronTrigger(hour=mf_f_h, minute=mf_f_m),
-                      id="meat_fire_evening",     args=["meat", "evening"],
-                      replace_existing=True)
-
-    print(f"[PO Scheduler] Jobs configured: dairy_evening={dairy_g_h:02d}:{dairy_g_m:02d}/{dairy_f_h:02d}:{dairy_f_m:02d} "
-          f"meat_morning={meat_g_h:02d}:{meat_g_m:02d}/{meat_f_h:02d}:{meat_f_m:02d} "
-          f"meat_flowers_evening={mf_g_h:02d}:{mf_g_m:02d}/{mf_f_h:02d}:{mf_f_m:02d}")
+    scheduler.add_job(
+        _fire_scheduled_po,
+        CronTrigger(hour=dairy_h, minute=dairy_m),
+        id="dairy_evening",
+        args=["dairy_evening"],
+        replace_existing=True,
+    )
+    print(f"[PO Scheduler] dairy_evening fires at {dairy_h:02d}:{dairy_m:02d}")
 
 
 def get_next_run_times() -> list[dict]:
-    """Return all scheduled jobs with their next fire time."""
     jobs = []
     for job in scheduler.get_jobs():
         next_run = job.next_run_time

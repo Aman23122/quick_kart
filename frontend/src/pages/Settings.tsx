@@ -52,11 +52,7 @@ const CONFIG_GROUPS: {
     icon: Clock,
     keys: [
       'po_dairy_evening_grace_time',
-      'po_dairy_evening_fire_time',
       'po_meat_morning_grace_time',
-      'po_meat_morning_fire_time',
-      'po_meat_flowers_evening_grace_time',
-      'po_meat_flowers_evening_fire_time',
     ],
     color: 'text-violet-600 bg-violet-50',
   },

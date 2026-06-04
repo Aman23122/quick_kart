@@ -1,63 +1,80 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Play, Clock, RefreshCw, ClipboardList, Plus, Send, Package, ArrowRight } from 'lucide-react'
-import { listDrafts, updateDraft, triggerPO, getSchedule, getOpenPOs, markPOSent, type OpenPO } from '@/services/poApi'
-import DraftPOCard, { type DraftPO } from '@/components/po/DraftPOCard'
-import DraftPOModal from '@/components/po/DraftPOModal'
+import { Clock, ClipboardList, Plus, Send, Package, ArrowRight, Edit3 } from 'lucide-react'
+import { getSchedule, getOpenPOs, markPOSent, getTemplate, type OpenPO, type POTemplate } from '@/services/poApi'
 import ManualPOForm from '@/components/po/ManualPOForm'
 import SchedulerLog from '@/components/po/SchedulerLog'
 import CountdownTimer from '@/components/po/CountdownTimer'
+import ScheduledTemplateModal from '@/components/po/ScheduledTemplateModal'
 import { useNavigate } from 'react-router-dom'
+import { formatCurrency } from '@/lib/utils'
 
 const SCHEDULE_SLOTS = [
-  { po_type: 'dairy', slot_label: 'Dairy Evening', description: 'Dairy products evening replenishment' },
-  { po_type: 'meat', slot_label: 'Meat Morning', description: 'Meat products morning replenishment' },
-  { po_type: 'meat', slot_label: 'Meat/Flowers Evening', description: 'Meat and flowers evening replenishment' },
+  { slotId: 'dairy_evening', slotLabel: 'Dairy Evening', description: 'Dairy products evening replenishment' },
 ]
 
+// ── Scheduled Replenishment Card ──────────────────────────────────────────────
+
 interface ScheduleCardProps {
-  slot: typeof SCHEDULE_SLOTS[0]
+  slotId: string
+  slotLabel: string
+  description: string
   nextRun: string | undefined
-  onTrigger: () => void
-  triggering: boolean
+  template: POTemplate | undefined
+  onEdit: () => void
 }
 
-function ScheduleCard({ slot, nextRun, onTrigger, triggering }: ScheduleCardProps) {
+function ScheduleCard({ slotId, slotLabel, description, nextRun, template, onEdit }: ScheduleCardProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-3">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-slate-800 text-sm">{slot.slot_label}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">{slot.description}</p>
+          <h3 className="font-semibold text-slate-800 text-sm">{slotLabel}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+          {template?.vendor_name && (
+            <p className="text-xs text-slate-400 mt-0.5 font-medium">{template.vendor_name}</p>
+          )}
         </div>
         <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase">
-          {slot.po_type}
+          {slotId.split('_')[0]}
         </span>
       </div>
+
+      {/* Next run */}
       <div className="flex items-center gap-2">
         <Clock size={13} className="text-slate-400" />
-        <span className="text-xs text-slate-500">Next run:</span>
-        {nextRun ? (
-          <CountdownTimer targetTime={nextRun} />
-        ) : (
-          <span className="text-xs text-slate-400">Not scheduled</span>
-        )}
+        <span className="text-xs text-slate-500">Next auto-fire:</span>
+        {nextRun
+          ? <CountdownTimer targetTime={nextRun} />
+          : <span className="text-xs text-slate-400">Not scheduled</span>
+        }
       </div>
+
+      {/* Template preview */}
+      {template && template.items.length > 0 && (
+        <div className="border border-slate-100 rounded-lg bg-slate-50 divide-y divide-slate-100 text-xs">
+          {template.items.map((it, i) => (
+            <div key={i} className="flex justify-between px-3 py-2 text-slate-600">
+              <span className="truncate">{it.product_name} — {it.variant_name}</span>
+              <span className="ml-2 shrink-0 text-slate-400">{it.ordered_qty} × ₹{it.unit_cost}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Edit button — always visible */}
       <button
-        onClick={onTrigger}
-        disabled={triggering}
-        className="flex items-center gap-2 w-full justify-center py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg transition-colors"
+        onClick={onEdit}
+        className="flex items-center gap-2 w-full justify-center py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
       >
-        {triggering ? (
-          <RefreshCw size={14} className="animate-spin" />
-        ) : (
-          <Play size={14} />
-        )}
-        Trigger Demo PO
+        <Edit3 size={14} /> Edit Template
       </button>
     </div>
   )
 }
+
+// ── Manual POs Section ────────────────────────────────────────────────────────
 
 function ManualPOSection() {
   const queryClient = useQueryClient()
@@ -79,7 +96,7 @@ function ManualPOSection() {
 
   const statusColor: Record<string, string> = {
     draft: 'bg-slate-100 text-slate-600',
-    sent:  'bg-blue-100 text-blue-700',
+    sent: 'bg-blue-100 text-blue-700',
   }
 
   return (
@@ -131,7 +148,7 @@ function ManualPOSection() {
                 <Package size={12} />
                 <span>{po.items.length} item{po.items.length !== 1 ? 's' : ''}</span>
                 <span className="text-slate-300">·</span>
-                <span>₹{po.total_amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                <span>{formatCurrency(po.total_amount)}</span>
               </div>
 
               {po.expected_receive_date && (
@@ -178,17 +195,10 @@ function ManualPOSection() {
   )
 }
 
-export default function POMonitor() {
-  const queryClient = useQueryClient()
-  const [editDraft, setEditDraft] = useState<DraftPO | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [triggeringSlot, setTriggeringSlot] = useState<string | null>(null)
+// ── Page ──────────────────────────────────────────────────────────────────────
 
-  const { data: draftsData, isLoading: draftsLoading } = useQuery({
-    queryKey: ['po-drafts'],
-    queryFn: () => listDrafts({ status: 'draft' }).then((r) => r.data),
-    refetchInterval: 30_000,
-  })
+export default function POMonitor() {
+  const [editingSlot, setEditingSlot] = useState<typeof SCHEDULE_SLOTS[0] | null>(null)
 
   const { data: scheduleData } = useQuery({
     queryKey: ['po-schedule'],
@@ -196,45 +206,17 @@ export default function POMonitor() {
     refetchInterval: 30_000,
   })
 
-  const saveMutation = useMutation({
-    mutationFn: ({ id, items, notes }: { id: string; items: DraftPO['line_items']; notes: string }) =>
-      updateDraft(id, { line_items: items, notes, status: 'overridden' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['po-drafts'] })
-      setModalOpen(false)
-      setEditDraft(null)
-    },
-  })
+  const templateQueries = SCHEDULE_SLOTS.map((slot) =>
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useQuery({
+      queryKey: ['po-template', slot.slotId],
+      queryFn: () => getTemplate(slot.slotId).then((r) => r.data),
+    })
+  )
 
-  const triggerMutation = useMutation({
-    mutationFn: ({ po_type, slot_label }: { po_type: string; slot_label: string }) =>
-      triggerPO(po_type, slot_label),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['po-drafts'] })
-      setTriggeringSlot(null)
-    },
-    onError: () => {
-      setTriggeringSlot(null)
-    },
-  })
-
-  const handleTrigger = (slot: typeof SCHEDULE_SLOTS[0]) => {
-    setTriggeringSlot(slot.slot_label)
-    triggerMutation.mutate({ po_type: slot.po_type, slot_label: slot.slot_label })
-  }
-
-  const getNextRunForSlot = (slotLabel: string): string | undefined => {
+  const getNextRun = (slotId: string): string | undefined => {
     const jobs = scheduleData?.jobs ?? []
-    const job = jobs.find(
-      (j) =>
-        j.job_id.toLowerCase().includes(slotLabel.toLowerCase().replace(/\s+/g, '_')) ||
-        j.job_id.toLowerCase().includes(slotLabel.toLowerCase().split(' ')[0])
-    )
-    return job?.next_run
-  }
-
-  const handleSave = (draftId: string, lineItems: DraftPO['line_items'], notes: string) => {
-    saveMutation.mutate({ id: draftId, items: lineItems, notes })
+    return jobs.find((j) => j.job_id === slotId)?.next_run
   }
 
   return (
@@ -244,69 +226,27 @@ export default function POMonitor() {
         <ManualPOSection />
       </div>
 
-      {/* Scheduler countdown cards */}
+      {/* Scheduled Replenishment */}
       <div>
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
           Scheduled Replenishment
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {SCHEDULE_SLOTS.map((slot) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {SCHEDULE_SLOTS.map((slot, i) => (
             <ScheduleCard
-              key={slot.slot_label}
-              slot={slot}
-              nextRun={getNextRunForSlot(slot.slot_label)}
-              onTrigger={() => handleTrigger(slot)}
-              triggering={triggeringSlot === slot.slot_label}
+              key={slot.slotId}
+              slotId={slot.slotId}
+              slotLabel={slot.slotLabel}
+              description={slot.description}
+              nextRun={getNextRun(slot.slotId)}
+              template={templateQueries[i].data}
+              onEdit={() => setEditingSlot(slot)}
             />
           ))}
         </div>
       </div>
 
-      {/* Active Draft POs */}
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
-            Active Draft POs
-          </h2>
-          {draftsData?.data && (
-            <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-              {draftsData.data.length}
-            </span>
-          )}
-        </div>
-
-        {draftsLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-3">
-                <div className="h-4 bg-slate-100 rounded animate-pulse w-3/4" />
-                <div className="h-3 bg-slate-100 rounded animate-pulse w-1/2" />
-                <div className="h-8 bg-slate-100 rounded animate-pulse w-full" />
-              </div>
-            ))}
-          </div>
-        ) : !draftsData?.data?.length ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400 bg-white rounded-xl border border-slate-100">
-            <ClipboardList size={32} className="opacity-30" />
-            <p className="text-sm">No active draft POs. Trigger a demo PO above to create one.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {draftsData.data.map((draft) => (
-              <DraftPOCard
-                key={draft.draft_id}
-                draft={draft}
-                onEdit={(d) => {
-                  setEditDraft(d)
-                  setModalOpen(true)
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Scheduler Log */}
+      {/* Scheduler Jobs */}
       <div>
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
           Scheduler Jobs
@@ -314,17 +254,15 @@ export default function POMonitor() {
         <SchedulerLog jobs={scheduleData?.jobs ?? []} />
       </div>
 
-      {/* Draft PO Modal */}
-      <DraftPOModal
-        draft={editDraft}
-        open={modalOpen}
-        onClose={() => {
-          setModalOpen(false)
-          setEditDraft(null)
-        }}
-        onSave={handleSave}
-        saving={saveMutation.isPending}
-      />
+      {/* Template edit modal */}
+      {editingSlot && (
+        <ScheduledTemplateModal
+          slotId={editingSlot.slotId}
+          slotLabel={editingSlot.slotLabel}
+          open={!!editingSlot}
+          onClose={() => setEditingSlot(null)}
+        />
+      )}
     </div>
   )
 }
