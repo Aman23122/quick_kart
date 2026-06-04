@@ -55,7 +55,7 @@ const statusQtyColor: Record<string, string> = {
   red: 'text-rose-600',
 }
 
-const expiryColor = (days: number | null): string => {
+export const expiryColor = (days: number | null): string => {
   if (days === null) return 'text-slate-400'
   if (days < 0) return 'text-rose-600 font-semibold'
   if (days <= 1) return 'text-rose-500 font-semibold'
