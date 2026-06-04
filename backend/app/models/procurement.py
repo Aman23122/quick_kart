@@ -13,6 +13,7 @@ class Procurement(Base):
     status = Column(String(50), nullable=False, default="draft")
     total_amount = Column(Numeric(14, 2), nullable=True)
     expected_receive_date = Column(Date, nullable=True)
+    expected_receive_time = Column(String(5), nullable=True)  # "HH:MM"
     actual_received_date = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
     created_by = Column(String(36), nullable=True)

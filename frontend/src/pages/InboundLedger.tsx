@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, XCircle, FileDown, Clock, Thermometer, ShieldAlert, ClipboardList } from 'lucide-react'
+import { CheckCircle, XCircle, FileDown, Clock, Thermometer, ShieldAlert, ClipboardList, Timer } from 'lucide-react'
 import {
   uploadInboundCSV,
   getInboundLedger,
@@ -46,6 +46,24 @@ const ledgerColumns: ColumnDef<InboundRow>[] = [
     key: 'sell_before_date',
     header: 'Sell Before',
     render: (r) => String(r.sell_before_date ?? '—'),
+  },
+  {
+    key: 'on_time',
+    header: 'On Time?',
+    render: (r) => {
+      if (r.on_time === null || r.on_time === undefined) {
+        return <span className="text-slate-300 text-xs">—</span>
+      }
+      return r.on_time ? (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700">
+          <Timer size={11} /> On Time
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-rose-50 text-rose-700">
+          <Timer size={11} /> Late
+        </span>
+      )
+    },
   },
   {
     key: 'status',

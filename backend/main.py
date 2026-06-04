@@ -6,9 +6,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
+from sqlalchemy import text
 from app.database import engine
 from app.models import *  # noqa: F401, F403 — registers all ORM models
 from app.database import Base
+
+
+def _run_migrations():
+    """Add new nullable columns to existing tables without dropping data."""
+    migrations = [
+        "ALTER TABLE procurement ADD COLUMN expected_receive_time VARCHAR(5) NULL",
+    ]
+    with engine.connect() as conn:
+        for stmt in migrations:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists
 from app.routers import inbound, outbound, inventory, alerts, po, config, dashboard, vendors, products
 from app.services.po_scheduler import scheduler, setup_jobs
 from app.config import settings
@@ -18,6 +33,7 @@ from app.config import settings
 async def lifespan(app: FastAPI):
     # Create any missing tables (new tables like draft_po, system_config)
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
 
     # Start APScheduler
     setup_jobs()

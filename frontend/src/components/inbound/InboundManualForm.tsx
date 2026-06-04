@@ -29,6 +29,7 @@ interface FormDraft {
   vendor_id: string
   vendor_invoice_number: string
   expected_receive_date: string
+  expected_receive_time: string
   notes: string
   items: ItemDraft[]
 }
@@ -83,6 +84,7 @@ function defaultDraft(): FormDraft {
     vendor_id: '',
     vendor_invoice_number: '',
     expected_receive_date: '',
+    expected_receive_time: '',
     notes: '',
     items: [emptyItem()],
   }
@@ -617,6 +619,7 @@ export default function InboundManualForm({ open, onClose }: Props) {
       vendor_id: draft.vendor_id,
       vendor_invoice_number: parseInt(draft.vendor_invoice_number),
       expected_receive_date: draft.expected_receive_date || undefined,
+      expected_receive_time: draft.expected_receive_time || undefined,
       notes: draft.notes || undefined,
       items: items.map((it) => ({
         variant_id: it.variant_id,
@@ -802,7 +805,7 @@ export default function InboundManualForm({ open, onClose }: Props) {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
+                  <div className="col-span-2 sm:col-span-1">
                     <label className="text-xs text-slate-600 font-medium mb-1.5 block">Invoice No. *</label>
                     <input
                       type="number"
@@ -813,14 +816,30 @@ export default function InboundManualForm({ open, onClose }: Props) {
                       placeholder="e.g. 100123"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-600 font-medium mb-1.5 block">Expected Date</label>
-                    <input
-                      type="date"
-                      className={inputCls}
-                      value={draft.expected_receive_date}
-                      onChange={(e) => setHeader('expected_receive_date', e.target.value)}
-                    />
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="text-xs text-slate-600 font-medium mb-1.5 block">
+                      Expected Date &amp; Time
+                      <span className="ml-1 font-normal text-slate-400">(optional)</span>
+                    </label>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={draft.expected_receive_date}
+                        onChange={(e) => setHeader('expected_receive_date', e.target.value)}
+                      />
+                      <input
+                        type="time"
+                        className={inputCls}
+                        value={draft.expected_receive_time}
+                        onChange={(e) => setHeader('expected_receive_time', e.target.value)}
+                        disabled={!draft.expected_receive_date}
+                        title="Expected arrival time"
+                      />
+                    </div>
+                    {draft.expected_receive_date && !draft.expected_receive_time && (
+                      <p className="text-xs text-slate-400 mt-1">No time = end of day (23:59) used for on-time check</p>
+                    )}
                   </div>
                 </div>
 

@@ -15,6 +15,9 @@ export interface InboundRow {
   batch_no?: string
   expiry_date?: string | null
   sell_before_date?: string | null
+  expected_receive_date?: string | null
+  expected_receive_time?: string | null
+  on_time?: boolean | null
   status?: string
   created_at?: string
   [key: string]: unknown
@@ -94,6 +97,7 @@ export interface ManualInboundPayload {
   vendor_id: string
   vendor_invoice_number: number
   expected_receive_date?: string
+  expected_receive_time?: string
   notes?: string
   items: ManualInboundItem[]
 }

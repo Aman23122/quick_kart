@@ -3,7 +3,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, UploadFile, File, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from datetime import date, datetime
+from datetime import date, datetime, time as dt_time
 from pydantic import BaseModel
 from app.database import get_db
 from app.services.csv_processor import process_inbound_csv
@@ -31,6 +31,7 @@ class ManualInboundPayload(BaseModel):
     vendor_id: str
     vendor_invoice_number: int
     expected_receive_date: Optional[str] = None
+    expected_receive_time: Optional[str] = None  # "HH:MM"
     notes: Optional[str] = None
     items: List[ManualInboundItem]
 
@@ -125,6 +126,7 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
         ))
 
     proc.status = "approved"
+    proc.actual_received_date = now().date()
     proc.updated_at = now()
     db.commit()
 
@@ -190,6 +192,20 @@ def get_inbound_ledger(
     for proc, item in rows:
         variant = db.get(ProductVariant, item.variant_id)
         vendor = db.get(Vendor, proc.vendor_id)
+
+        # Compute on_time: compare created_at vs expected date+time
+        on_time = None
+        if proc.expected_receive_date and proc.created_at:
+            exp_time = dt_time(23, 59)
+            if proc.expected_receive_time:
+                try:
+                    h, m = proc.expected_receive_time.split(":")
+                    exp_time = dt_time(int(h), int(m))
+                except ValueError:
+                    pass
+            expected_dt = datetime.combine(proc.expected_receive_date, exp_time)
+            on_time = proc.created_at <= expected_dt
+
         result.append({
             "procurement_id": proc.procurement_id,
             "po_number": proc.po_number,
@@ -205,6 +221,9 @@ def get_inbound_ledger(
             "batch_no": item.batch_no,
             "expiry_date": str(item.expiry_date) if item.expiry_date else None,
             "sell_before_date": str(item.sell_before_date),
+            "expected_receive_date": str(proc.expected_receive_date) if proc.expected_receive_date else None,
+            "expected_receive_time": proc.expected_receive_time,
+            "on_time": on_time,
             "status": proc.status,
             "created_at": format_ts(proc.created_at),
         })
@@ -240,6 +259,13 @@ def submit_manual_inbound(payload: ManualInboundPayload, db: Session = Depends(g
             rows.append({"variant_id": item.variant_id, "status": "error", "reason": "Invalid sell_before_date"})
             continue
 
+        exp_date = None
+        if payload.expected_receive_date:
+            try:
+                exp_date = datetime.strptime(payload.expected_receive_date, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+
         proc = Procurement(
             procurement_id=proc_id,
             vendor_id=payload.vendor_id,
@@ -249,6 +275,8 @@ def submit_manual_inbound(payload: ManualInboundPayload, db: Session = Depends(g
             status=status,
             total_amount=total_cost,
             notes=payload.notes,
+            expected_receive_date=exp_date,
+            expected_receive_time=payload.expected_receive_time or None,
             created_at=now(),
             updated_at=now(),
         )
