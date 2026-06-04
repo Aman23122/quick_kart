@@ -1,0 +1,26 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import AppShell from '@/components/layout/AppShell'
+import Dashboard from '@/pages/Dashboard'
+import InboundLedger from '@/pages/InboundLedger'
+import OutboundLedger from '@/pages/OutboundLedger'
+import InventoryGrid from '@/pages/InventoryGrid'
+import POMonitor from '@/pages/POMonitor'
+import AlertLog from '@/pages/AlertLog'
+import Settings from '@/pages/Settings'
+
+export default function App() {
+  return (
+    <AppShell>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/inbound" element={<InboundLedger />} />
+        <Route path="/outbound" element={<OutboundLedger />} />
+        <Route path="/inventory" element={<InventoryGrid />} />
+        <Route path="/po" element={<POMonitor />} />
+        <Route path="/alerts" element={<AlertLog />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppShell>
+  )
+}

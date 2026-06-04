@@ -1,0 +1,12 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.30
+pymysql==1.1.1
+cryptography==42.0.8
+pydantic==2.7.1
+pydantic-settings==2.2.1
+python-multipart==0.0.9
+apscheduler==3.10.4
+pandas==2.2.2
+python-dateutil==2.9.0
+email-validator==2.1.1
