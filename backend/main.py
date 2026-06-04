@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from app.database import engine
 from app.models import *  # noqa: F401, F403 — registers all ORM models
 from app.database import Base
-from app.routers import inbound, outbound, inventory, alerts, po, config, dashboard
+from app.routers import inbound, outbound, inventory, alerts, po, config, dashboard, vendors, products
 from app.services.po_scheduler import scheduler, setup_jobs
 from app.config import settings
 
@@ -51,6 +51,8 @@ app.include_router(alerts.router)
 app.include_router(po.router)
 app.include_router(config.router)
 app.include_router(dashboard.router)
+app.include_router(vendors.router)
+app.include_router(products.router)
 
 
 @app.get("/")

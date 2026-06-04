@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, XCircle, FileDown, Clock, Thermometer, ShieldAlert } from 'lucide-react'
+import { CheckCircle, XCircle, FileDown, Clock, Thermometer, ShieldAlert, ClipboardList } from 'lucide-react'
 import {
   uploadInboundCSV,
   getInboundLedger,
@@ -15,6 +15,7 @@ import CSVUploader from '@/components/shared/CSVUploader'
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable'
 import StatusBadge from '@/components/shared/StatusBadge'
 import ExportButton from '@/components/shared/ExportButton'
+import InboundManualForm from '@/components/inbound/InboundManualForm'
 
 const PAGE_SIZE = 20
 
@@ -220,6 +221,7 @@ export default function InboundLedger() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [status, setStatus] = useState('')
+  const [showManualForm, setShowManualForm] = useState(false)
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['inbound-ledger', page, dateFrom, dateTo, status],
@@ -252,21 +254,30 @@ export default function InboundLedger() {
 
       {/* Upload section */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold text-slate-800">Upload Inbound CSV</h2>
+            <h2 className="font-semibold text-slate-800">Add Inbound Stock</h2>
             <p className="text-sm text-slate-500 mt-0.5">
-              Upload a CSV file to record inbound stock entries.
+              Upload a CSV file or fill the form manually to record inbound entries.
             </p>
           </div>
-          <a
-            href="/sample_csvs/inbound_sample.csv"
-            download
-            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
-          >
-            <FileDown size={15} />
-            Download Sample
-          </a>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowManualForm(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+            >
+              <ClipboardList size={15} />
+              Manual Entry
+            </button>
+            <a
+              href="/sample_csvs/inbound_sample.csv"
+              download
+              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              <FileDown size={15} />
+              Sample CSV
+            </a>
+          </div>
         </div>
 
         <CSVUploader
@@ -364,9 +375,11 @@ export default function InboundLedger() {
           page={page}
           onPageChange={setPage}
           pageSize={PAGE_SIZE}
-          emptyMessage="No inbound records found. Upload a CSV to get started."
+          emptyMessage="No inbound records found. Upload a CSV or use Manual Entry to get started."
         />
       </div>
+
+      <InboundManualForm open={showManualForm} onClose={() => setShowManualForm(false)} />
     </div>
   )
 }

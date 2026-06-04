@@ -78,3 +78,25 @@ export const rejectInbound = (procurementId: string) =>
 
 export const getInboundLedger = (params: InboundLedgerParams) =>
   api.get<{ total: number; data: InboundRow[] }>('/api/inbound/ledger', { params })
+
+export interface ManualInboundItem {
+  variant_id: string
+  ordered_qty: number
+  received_qty: number
+  temperature_measured: number
+  unit_cost: number
+  expiry_date?: string
+  sell_before_date: string
+  batch_no?: string
+}
+
+export interface ManualInboundPayload {
+  vendor_id: string
+  vendor_invoice_number: number
+  expected_receive_date?: string
+  notes?: string
+  items: ManualInboundItem[]
+}
+
+export const submitManualInbound = (payload: ManualInboundPayload) =>
+  api.post<UploadResult>('/api/inbound/manual', payload)
