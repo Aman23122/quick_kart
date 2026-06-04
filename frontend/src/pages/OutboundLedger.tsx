@@ -5,17 +5,14 @@ import {
   ShieldAlert, ChevronDown, ChevronRight, PackageCheck,
 } from 'lucide-react'
 import {
-  uploadOutboundCSV,
   getOutboundLedger,
   getPendingOutbound,
   approveOutbound,
   rejectOutbound,
   type OutboundRow,
-  type OutboundUploadResult,
   type PendingOrder,
   type PendingOrderLine,
 } from '@/services/outboundApi'
-import CSVUploader from '@/components/shared/CSVUploader'
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable'
 import StatusBadge from '@/components/shared/StatusBadge'
 import ExportButton from '@/components/shared/ExportButton'
@@ -283,13 +280,12 @@ function PendingOutboundPanel() {
 }
 
 export default function OutboundLedger() {
-  const [uploadResult, setUploadResult] = useState<OutboundUploadResult | null>(null)
   const [page, setPage] = useState(1)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [status, setStatus] = useState('')
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['outbound-ledger', page, dateFrom, dateTo, status],
     queryFn: () =>
       getOutboundLedger({
@@ -301,59 +297,10 @@ export default function OutboundLedger() {
       }).then((r) => r.data),
   })
 
-  const uploadMutation = useMutation({
-    mutationFn: uploadOutboundCSV,
-    onSuccess: (result) => {
-      setUploadResult(result)
-      refetch()
-    },
-  })
-
   return (
     <div className="space-y-6">
       {/* Pending approvals — hidden when empty */}
       <PendingOutboundPanel />
-
-      {/* Upload */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
-        <div>
-          <h2 className="font-semibold text-slate-800">Upload Outbound CSV</h2>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Upload a CSV file to stage an outbound order for admin review.
-          </p>
-        </div>
-
-        <CSVUploader
-          onUpload={(file) => uploadMutation.mutate(file)}
-          loading={uploadMutation.isPending}
-          label="Drop outbound CSV here or click to browse"
-        />
-
-        {uploadResult && (
-          <div className="flex flex-wrap gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-amber-500" />
-              <span className="text-sm font-medium text-slate-700">
-                Pending Approval:{' '}
-                <span className="text-amber-600 font-bold">{uploadResult.pending_approval}</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-500">
-                Items:{' '}
-                <span className="font-medium text-slate-700">{uploadResult.processed}</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
-              Order: {uploadResult.order_id.slice(0, 16)}…
-            </div>
-          </div>
-        )}
-
-        {uploadMutation.isError && (
-          <p className="text-sm text-rose-600">Upload failed. Please check the file format.</p>
-        )}
-      </div>
 
       {/* Ledger */}
       <div className="space-y-4">
