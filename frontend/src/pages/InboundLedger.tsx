@@ -1,21 +1,17 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, XCircle, FileDown, Clock, Thermometer, ShieldAlert, ClipboardList, Timer } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Thermometer, ShieldAlert, Timer } from 'lucide-react'
 import {
-  uploadInboundCSV,
   getInboundLedger,
   getPendingApprovals,
   approveInbound,
   rejectInbound,
   type InboundRow,
-  type UploadResult,
   type PendingItem,
 } from '@/services/inboundApi'
-import CSVUploader from '@/components/shared/CSVUploader'
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable'
 import StatusBadge from '@/components/shared/StatusBadge'
 import ExportButton from '@/components/shared/ExportButton'
-import InboundManualForm from '@/components/inbound/InboundManualForm'
 
 const PAGE_SIZE = 20
 
@@ -234,14 +230,12 @@ function PendingApprovalPanel() {
 }
 
 export default function InboundLedger() {
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
   const [page, setPage] = useState(1)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [status, setStatus] = useState('')
-  const [showManualForm, setShowManualForm] = useState(false)
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['inbound-ledger', page, dateFrom, dateTo, status],
     queryFn: () =>
       getInboundLedger({
@@ -253,102 +247,20 @@ export default function InboundLedger() {
       }).then((r) => r.data),
   })
 
-  const uploadMutation = useMutation({
-    mutationFn: uploadInboundCSV,
-    onSuccess: (result) => {
-      setUploadResult(result)
-      refetch()
-    },
-  })
-
-  const handleUpload = (file: File) => {
-    uploadMutation.mutate(file)
-  }
-
   return (
     <div className="space-y-6">
       {/* Pending approvals — hidden when empty */}
       <PendingApprovalPanel />
 
-      {/* Upload section */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-slate-800">Add Inbound Stock</h2>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Upload a CSV file or fill the form manually to record inbound entries.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setShowManualForm(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-            >
-              <ClipboardList size={15} />
-              Manual Entry
-            </button>
-            <a
-              href="/sample_csvs/inbound_sample.csv"
-              download
-              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              <FileDown size={15} />
-              Sample CSV
-            </a>
-          </div>
-        </div>
-
-        <CSVUploader
-          onUpload={handleUpload}
-          loading={uploadMutation.isPending}
-          label="Drop inbound CSV here or click to browse"
-        />
-
-        {/* Upload result */}
-        {uploadResult && (
-          <div className="flex flex-wrap gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-amber-500" />
-              <span className="text-sm font-medium text-slate-700">
-                Pending Approval:{' '}
-                <span className="text-amber-600 font-bold">{uploadResult.pending_approval}</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <XCircle size={16} className="text-rose-500" />
-              <span className="text-sm font-medium text-slate-700">
-                Rejected:{' '}
-                <span className="text-rose-600 font-bold">{uploadResult.rejected}</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-500">
-                Total Processed:{' '}
-                <span className="font-medium text-slate-700">{uploadResult.processed}</span>
-              </span>
-            </div>
-            {uploadMutation.isError && (
-              <p className="w-full text-sm text-rose-600">
-                Upload failed. Please check the file format.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Ledger */}
       <div className="space-y-4">
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <label className="text-xs text-slate-500 font-medium">From</label>
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => {
-                setDateFrom(e.target.value)
-                setPage(1)
-              }}
+              onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
               className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
             />
           </div>
@@ -357,19 +269,13 @@ export default function InboundLedger() {
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => {
-                setDateTo(e.target.value)
-                setPage(1)
-              }}
+              onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
               className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
             />
           </div>
           <select
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => { setStatus(e.target.value); setPage(1) }}
             className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white"
           >
             <option value="">All Status</option>
@@ -393,11 +299,9 @@ export default function InboundLedger() {
           page={page}
           onPageChange={setPage}
           pageSize={PAGE_SIZE}
-          emptyMessage="No inbound records found. Upload a CSV or use Manual Entry to get started."
+          emptyMessage="No inbound records yet."
         />
       </div>
-
-      <InboundManualForm open={showManualForm} onClose={() => setShowManualForm(false)} />
     </div>
   )
 }
