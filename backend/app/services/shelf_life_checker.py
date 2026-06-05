@@ -54,7 +54,7 @@ def check_dispatch_block(
 
         limit = int(_get_cfg(db, config_key, "999"))
 
-        # Find oldest relevant procurement batch
+        # Find oldest relevant procurement batch — only consider non-expired batches with stock
         item = (
             db.query(ProcurementItem)
             .filter(ProcurementItem.variant_id == variant_id)
@@ -63,7 +63,10 @@ def check_dispatch_block(
             if procurement_item_id
             else (
                 db.query(ProcurementItem)
-                .filter(ProcurementItem.variant_id == variant_id)
+                .filter(
+                    ProcurementItem.variant_id == variant_id,
+                    ProcurementItem.sell_before_date >= datetime.now().date(),
+                )
                 .order_by(ProcurementItem.created_at.asc())
                 .first()
             )
