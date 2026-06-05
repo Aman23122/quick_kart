@@ -124,6 +124,7 @@ export default function InboundEntryPage() {
   const { data: openPOsData } = useQuery({
     queryKey: ['open-pos'],
     queryFn: () => getOpenPOs().then((r) => r.data),
+    refetchInterval: 30_000,
   })
   const openPOs: OpenPO[] = openPOsData?.data ?? []
 

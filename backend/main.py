@@ -18,6 +18,9 @@ def _run_migrations():
         "ALTER TABLE procurement ADD COLUMN expected_receive_time VARCHAR(5) NULL",
         "ALTER TABLE procurement MODIFY COLUMN vendor_invoice_number BIGINT NULL",
         "ALTER TABLE procurement ADD COLUMN actual_received_time VARCHAR(5) NULL",
+        "ALTER TABLE scheduled_po_template ADD COLUMN label VARCHAR(100) NULL",
+        "ALTER TABLE scheduled_po_template ADD COLUMN cron_time VARCHAR(5) NULL",
+        "ALTER TABLE scheduled_po_template ADD COLUMN expected_receive_time VARCHAR(5) NULL",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

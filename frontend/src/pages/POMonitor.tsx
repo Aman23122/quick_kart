@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Clock, ClipboardList, Plus, Send, Package, ArrowRight, Edit3 } from 'lucide-react'
-import { getSchedule, getOpenPOs, markPOSent, getTemplate, type OpenPO, type POTemplate } from '@/services/poApi'
+import { Clock, ClipboardList, Plus, Send, Package, ArrowRight, Edit3, Trash2 } from 'lucide-react'
+import {
+  getSchedule, getOpenPOs, markPOSent, deletePO,
+  getTemplates, deleteTemplate, type OpenPO, type POTemplate,
+} from '@/services/poApi'
 import ManualPOForm from '@/components/po/ManualPOForm'
 import SchedulerLog from '@/components/po/SchedulerLog'
 import CountdownTimer from '@/components/po/CountdownTimer'
@@ -9,50 +12,68 @@ import ScheduledTemplateModal from '@/components/po/ScheduledTemplateModal'
 import { useNavigate } from 'react-router-dom'
 import { formatCurrency } from '@/lib/utils'
 
-const SCHEDULE_SLOTS = [
-  { slotId: 'dairy_evening', slotLabel: 'Dairy Evening', description: 'Dairy products evening replenishment' },
-]
-
 // ── Scheduled Replenishment Card ──────────────────────────────────────────────
 
 interface ScheduleCardProps {
-  slotId: string
-  slotLabel: string
-  description: string
+  template: POTemplate
   nextRun: string | undefined
-  template: POTemplate | undefined
   onEdit: () => void
+  onDelete: () => void
+  deleteDisabled?: boolean
 }
 
-function ScheduleCard({ slotId, slotLabel, description, nextRun, template, onEdit }: ScheduleCardProps) {
+function ScheduleCard({ template, nextRun, onEdit, onDelete, deleteDisabled }: ScheduleCardProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-3">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-slate-800 text-sm">{slotLabel}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">{description}</p>
-          {template?.vendor_name && (
+          <h3 className="font-semibold text-slate-800 text-sm">{template.label}</h3>
+          {template.vendor_name && (
             <p className="text-xs text-slate-400 mt-0.5 font-medium">{template.vendor_name}</p>
           )}
         </div>
-        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase">
-          {slotId.split('_')[0]}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded border border-violet-100 uppercase">
+            Daily
+          </span>
+          <button
+            onClick={() => {
+              if (confirm(`Delete schedule "${template.label}"? This will stop future auto-fires.`))
+                onDelete()
+            }}
+            disabled={deleteDisabled}
+            className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+            title="Delete schedule"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
 
       {/* Next run */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Clock size={13} className="text-slate-400" />
-        <span className="text-xs text-slate-500">Next auto-fire:</span>
+        {template.cron_time && (
+          <span className="text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+            {template.cron_time} daily
+          </span>
+        )}
+        <span className="text-xs text-slate-400">→</span>
         {nextRun
           ? <CountdownTimer targetTime={nextRun} />
           : <span className="text-xs text-slate-400">Not scheduled</span>
         }
       </div>
+      {template.expected_receive_time && (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <Clock size={12} className="text-slate-300" />
+          <span>Delivery at <span className="font-mono">{template.expected_receive_time}</span></span>
+        </div>
+      )}
 
-      {/* Template preview */}
-      {template && template.items.length > 0 && (
+      {/* Template item preview */}
+      {template.items.length > 0 && (
         <div className="border border-slate-100 rounded-lg bg-slate-50 divide-y divide-slate-100 text-xs">
           {template.items.map((it, i) => (
             <div key={i} className="flex justify-between px-3 py-2 text-slate-600">
@@ -63,7 +84,7 @@ function ScheduleCard({ slotId, slotLabel, description, nextRun, template, onEdi
         </div>
       )}
 
-      {/* Edit button — always visible */}
+      {/* Edit button */}
       <button
         onClick={onEdit}
         className="flex items-center gap-2 w-full justify-center py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
@@ -89,6 +110,11 @@ function ManualPOSection() {
 
   const sendMutation = useMutation({
     mutationFn: markPOSent,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['po-open-monitor'] }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deletePO,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['po-open-monitor'] }),
   })
 
@@ -184,6 +210,17 @@ function ManualPOSection() {
                 >
                   <ArrowRight size={12} /> Receive Stock
                 </button>
+                <button
+                  onClick={() => {
+                    if (confirm(`Delete ${po.po_number}? This cannot be undone.`))
+                      deleteMutation.mutate(po.procurement_id)
+                  }}
+                  disabled={deleteMutation.isPending}
+                  className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                  title="Delete PO"
+                >
+                  <Trash2 size={13} />
+                </button>
               </div>
             </div>
           ))}
@@ -198,7 +235,8 @@ function ManualPOSection() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function POMonitor() {
-  const [editingSlot, setEditingSlot] = useState<typeof SCHEDULE_SLOTS[0] | null>(null)
+  const queryClient = useQueryClient()
+  const [editingTemplate, setEditingTemplate] = useState<POTemplate | null>(null)
 
   const { data: scheduleData } = useQuery({
     queryKey: ['po-schedule'],
@@ -206,18 +244,24 @@ export default function POMonitor() {
     refetchInterval: 5_000,
   })
 
-  const templateQueries = SCHEDULE_SLOTS.map((slot) =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useQuery({
-      queryKey: ['po-template', slot.slotId],
-      queryFn: () => getTemplate(slot.slotId).then((r) => r.data),
-    })
-  )
+  const { data: templatesData, isLoading: templatesLoading } = useQuery({
+    queryKey: ['po-templates'],
+    queryFn: () => getTemplates().then((r) => r.data),
+    refetchInterval: 10_000,
+  })
 
-  const getNextRun = (slotId: string): string | undefined => {
-    const jobs = scheduleData?.jobs ?? []
-    return jobs.find((j) => j.job_id === slotId)?.next_run
-  }
+  const deleteTemplateMutation = useMutation({
+    mutationFn: deleteTemplate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['po-templates'] })
+      queryClient.invalidateQueries({ queryKey: ['po-schedule'] })
+    },
+  })
+
+  const templates: POTemplate[] = templatesData?.templates ?? []
+
+  const getNextRun = (slotId: string): string | undefined =>
+    (scheduleData?.jobs ?? []).find((j) => j.job_id === slotId)?.next_run
 
   return (
     <div className="space-y-8">
@@ -231,19 +275,35 @@ export default function POMonitor() {
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
           Scheduled Replenishment
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {SCHEDULE_SLOTS.map((slot, i) => (
-            <ScheduleCard
-              key={slot.slotId}
-              slotId={slot.slotId}
-              slotLabel={slot.slotLabel}
-              description={slot.description}
-              nextRun={getNextRun(slot.slotId)}
-              template={templateQueries[i].data}
-              onEdit={() => setEditingSlot(slot)}
-            />
-          ))}
-        </div>
+
+        {templatesLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="bg-white rounded-xl border border-slate-100 p-5 space-y-3">
+                <div className="h-4 bg-slate-100 rounded animate-pulse w-3/4" />
+                <div className="h-3 bg-slate-100 rounded animate-pulse w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 text-slate-400 bg-white rounded-xl border border-slate-100">
+            <ClipboardList size={28} className="opacity-30" />
+            <p className="text-sm">No scheduled POs. Use "Create PO → Daily PO" to add one.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {templates.map((tmpl) => (
+              <ScheduleCard
+                key={tmpl.slot_id}
+                template={tmpl}
+                nextRun={getNextRun(tmpl.slot_id)}
+                onEdit={() => setEditingTemplate(tmpl)}
+                onDelete={() => deleteTemplateMutation.mutate(tmpl.slot_id)}
+                deleteDisabled={deleteTemplateMutation.isPending}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Scheduler Jobs */}
@@ -255,12 +315,12 @@ export default function POMonitor() {
       </div>
 
       {/* Template edit modal */}
-      {editingSlot && (
+      {editingTemplate && (
         <ScheduledTemplateModal
-          slotId={editingSlot.slotId}
-          slotLabel={editingSlot.slotLabel}
-          open={!!editingSlot}
-          onClose={() => setEditingSlot(null)}
+          slotId={editingTemplate.slot_id}
+          slotLabel={editingTemplate.label}
+          open={!!editingTemplate}
+          onClose={() => setEditingTemplate(null)}
         />
       )}
     </div>

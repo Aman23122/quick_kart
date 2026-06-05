@@ -20,9 +20,12 @@ export interface TemplateItem {
 
 export interface POTemplate {
   slot_id: string
+  label: string
   vendor_id: string
   vendor_name: string
   notes: string
+  cron_time: string
+  expected_receive_time: string
   items: TemplateItem[]
 }
 
@@ -30,13 +33,33 @@ export interface TemplateUpdatePayload {
   vendor_id?: string
   notes?: string
   items?: Array<{ variant_id: string; ordered_qty: number; unit_cost: number }>
+  cron_time?: string
+  expected_receive_time?: string
 }
+
+export interface CreateTemplatePayload {
+  label: string
+  vendor_id: string
+  cron_time: string
+  expected_receive_time: string
+  notes?: string
+  items: Array<{ variant_id: string; ordered_qty: number; unit_cost: number }>
+}
+
+export const getTemplates = () =>
+  api.get<{ templates: POTemplate[] }>('/api/po/templates')
 
 export const getTemplate = (slotId: string) =>
   api.get<POTemplate>(`/api/po/template/${slotId}`)
 
 export const updateTemplate = (slotId: string, data: TemplateUpdatePayload) =>
   api.put<{ status: string }>(`/api/po/template/${slotId}`, data)
+
+export const createDailyPO = (data: CreateTemplatePayload) =>
+  api.post<{ slot_id: string; label: string; status: string }>('/api/po/template', data)
+
+export const deleteTemplate = (slotId: string) =>
+  api.delete<{ status: string }>(`/api/po/template/${slotId}`)
 
 // ─── Manual PO ───────────────────────────────────────────────────────────────
 
@@ -88,3 +111,6 @@ export const getOpenPOs = () =>
 
 export const markPOSent = (procurementId: string) =>
   api.patch<{ status: string; po_number: string }>(`/api/po/${procurementId}/send`)
+
+export const deletePO = (procurementId: string) =>
+  api.delete<{ status: string }>(`/api/po/${procurementId}`)

@@ -31,6 +31,8 @@ export default function ScheduledTemplateModal({ slotId, slotLabel, open, onClos
   const queryClient = useQueryClient()
   const [vendorId, setVendorId] = useState('')
   const [notes, setNotes] = useState('')
+  const [cronTime, setCronTime] = useState('')
+  const [receiveTime, setReceiveTime] = useState('')
   const [items, setItems] = useState<ItemDraft[]>([emptyItem()])
   const [saved, setSaved] = useState(false)
 
@@ -51,6 +53,8 @@ export default function ScheduledTemplateModal({ slotId, slotLabel, open, onClos
     if (!template) return
     setVendorId(template.vendor_id ?? '')
     setNotes(template.notes ?? '')
+    setCronTime(template.cron_time ?? '')
+    setReceiveTime(template.expected_receive_time ?? '')
     setItems(
       template.items.length > 0
         ? template.items.map((it) => ({
@@ -70,6 +74,8 @@ export default function ScheduledTemplateModal({ slotId, slotLabel, open, onClos
       updateTemplate(slotId, {
         vendor_id: vendorId || undefined,
         notes: notes || undefined,
+        cron_time: cronTime || undefined,
+        expected_receive_time: receiveTime || undefined,
         items: items
           .filter((i) => i.variant_id && i.ordered_qty)
           .map((i) => ({
@@ -80,6 +86,7 @@ export default function ScheduledTemplateModal({ slotId, slotLabel, open, onClos
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['po-template', slotId] })
+      queryClient.invalidateQueries({ queryKey: ['po-templates'] })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     },
@@ -128,14 +135,6 @@ export default function ScheduledTemplateModal({ slotId, slotLabel, open, onClos
             </div>
           ) : (
             <div className="space-y-5">
-              {/* Delivery note */}
-              <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-                <CalendarClock size={13} className="mt-0.5 shrink-0" />
-                <span>
-                  Expected delivery is auto-set: if PO fires between 12:00–4:00 AM → same day 10:00 AM, otherwise → next day 10:00 AM.
-                </span>
-              </div>
-
               {/* Vendor */}
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">PO Details</p>
@@ -152,6 +151,21 @@ export default function ScheduledTemplateModal({ slotId, slotLabel, open, onClos
                   <label className="text-xs text-slate-600 font-medium mb-1.5 block">Notes</label>
                   <textarea rows={2} className={`${inputCls} resize-none`} value={notes}
                     onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-600 font-medium mb-1.5 block">
+                      Fire Time
+                      <span className="ml-1 font-normal text-slate-400">(daily)</span>
+                    </label>
+                    <input type="time" className={inputCls} value={cronTime}
+                      onChange={(e) => setCronTime(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 font-medium mb-1.5 block">Expected Receive Time</label>
+                    <input type="time" className={inputCls} value={receiveTime}
+                      onChange={(e) => setReceiveTime(e.target.value)} />
+                  </div>
                 </div>
               </div>
 

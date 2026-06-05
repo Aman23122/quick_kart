@@ -158,17 +158,100 @@ def mark_po_sent(procurement_id: str, db: Session = Depends(get_db)):
     return {"status": "sent", "procurement_id": procurement_id, "po_number": proc.po_number}
 
 
+@router.delete("/{procurement_id}")
+def delete_po(procurement_id: str, db: Session = Depends(get_db)):
+    proc = db.get(Procurement, procurement_id)
+    if not proc:
+        raise HTTPException(404, "PO not found")
+    db.query(ProcurementItem).filter(ProcurementItem.procurement_id == procurement_id).delete()
+    db.delete(proc)
+    db.commit()
+    return {"status": "deleted", "procurement_id": procurement_id}
+
+
 # ─── Scheduled PO Templates ──────────────────────────────────────────────────
+
+def _slot_label(tmpl: ScheduledPOTemplate) -> str:
+    return tmpl.label or tmpl.slot_id.replace("_", " ").title()
+
+
+def _enrich_items(items: list, db: Session) -> list:
+    result = []
+    for it in (items or []):
+        variant = db.get(ProductVariant, it["variant_id"])
+        product = db.get(Product, variant.product_id) if variant else None
+        result.append({
+            "variant_id": it["variant_id"],
+            "product_name": product.product_name if product else "",
+            "variant_name": variant.variant_name if variant else "",
+            "ordered_qty": it["ordered_qty"],
+            "unit_cost": it["unit_cost"],
+        })
+    return result
+
 
 class TemplateItem(BaseModel):
     variant_id: str
     ordered_qty: int
     unit_cost: float
 
+
 class TemplateUpdate(BaseModel):
     vendor_id: Optional[str] = None
     notes: Optional[str] = None
     items: Optional[List[TemplateItem]] = None
+    cron_time: Optional[str] = None
+    expected_receive_time: Optional[str] = None
+
+
+class CreateTemplatePayload(BaseModel):
+    label: str
+    vendor_id: str
+    cron_time: str
+    expected_receive_time: str
+    notes: Optional[str] = None
+    items: List[TemplateItem]
+
+
+@router.get("/templates")
+def list_templates(db: Session = Depends(get_db)):
+    templates = db.query(ScheduledPOTemplate).all()
+    result = []
+    for tmpl in templates:
+        vendor = db.get(Vendor, tmpl.vendor_id) if tmpl.vendor_id else None
+        result.append({
+            "slot_id": tmpl.slot_id,
+            "label": _slot_label(tmpl),
+            "vendor_id": tmpl.vendor_id or "",
+            "vendor_name": vendor.name if vendor else "",
+            "notes": tmpl.notes or "",
+            "cron_time": tmpl.cron_time or "",
+            "expected_receive_time": tmpl.expected_receive_time or "",
+            "items": _enrich_items(tmpl.items, db),
+        })
+    return {"templates": result}
+
+
+@router.post("/template")
+def create_template(payload: CreateTemplatePayload, db: Session = Depends(get_db)):
+    vendor = db.get(Vendor, payload.vendor_id)
+    if not vendor:
+        raise HTTPException(404, "Vendor not found")
+    slot_id = f"daily_{new_id()[:8]}"
+    tmpl = ScheduledPOTemplate(
+        slot_id=slot_id,
+        label=payload.label,
+        vendor_id=payload.vendor_id,
+        notes=payload.notes or None,
+        cron_time=payload.cron_time or None,
+        expected_receive_time=payload.expected_receive_time or None,
+        items=[{"variant_id": i.variant_id, "ordered_qty": i.ordered_qty, "unit_cost": i.unit_cost} for i in payload.items],
+    )
+    db.add(tmpl)
+    db.commit()
+    from app.services.po_scheduler import setup_jobs
+    setup_jobs()
+    return {"slot_id": slot_id, "label": payload.label, "status": "created"}
 
 
 @router.get("/template/{slot_id}")
@@ -176,27 +259,16 @@ def get_template(slot_id: str, db: Session = Depends(get_db)):
     tmpl = db.get(ScheduledPOTemplate, slot_id)
     if not tmpl:
         raise HTTPException(404, f"Template '{slot_id}' not found")
-
     vendor = db.get(Vendor, tmpl.vendor_id) if tmpl.vendor_id else None
-
-    enriched_items = []
-    for it in (tmpl.items or []):
-        variant = db.get(ProductVariant, it["variant_id"])
-        product = db.get(Product, variant.product_id) if variant else None
-        enriched_items.append({
-            "variant_id": it["variant_id"],
-            "product_name": product.product_name if product else "",
-            "variant_name": variant.variant_name if variant else "",
-            "ordered_qty": it["ordered_qty"],
-            "unit_cost": it["unit_cost"],
-        })
-
     return {
         "slot_id": tmpl.slot_id,
-        "vendor_id": tmpl.vendor_id,
+        "label": _slot_label(tmpl),
+        "vendor_id": tmpl.vendor_id or "",
         "vendor_name": vendor.name if vendor else "",
         "notes": tmpl.notes or "",
-        "items": enriched_items,
+        "cron_time": tmpl.cron_time or "",
+        "expected_receive_time": tmpl.expected_receive_time or "",
+        "items": _enrich_items(tmpl.items, db),
     }
 
 
@@ -205,11 +277,33 @@ def update_template(slot_id: str, payload: TemplateUpdate, db: Session = Depends
     tmpl = db.get(ScheduledPOTemplate, slot_id)
     if not tmpl:
         raise HTTPException(404, f"Template '{slot_id}' not found")
+    reschedule = False
     if payload.vendor_id is not None:
         tmpl.vendor_id = payload.vendor_id
     if payload.notes is not None:
         tmpl.notes = payload.notes
     if payload.items is not None:
         tmpl.items = [{"variant_id": i.variant_id, "ordered_qty": i.ordered_qty, "unit_cost": i.unit_cost} for i in payload.items]
+    if payload.cron_time is not None:
+        tmpl.cron_time = payload.cron_time or None
+        reschedule = True
+    if payload.expected_receive_time is not None:
+        tmpl.expected_receive_time = payload.expected_receive_time or None
     db.commit()
+    if reschedule:
+        from app.services.po_scheduler import setup_jobs
+        setup_jobs()
     return {"status": "updated", "slot_id": slot_id}
+
+
+@router.delete("/template/{slot_id}")
+def delete_template(slot_id: str, db: Session = Depends(get_db)):
+    tmpl = db.get(ScheduledPOTemplate, slot_id)
+    if not tmpl:
+        raise HTTPException(404, f"Template '{slot_id}' not found")
+    db.delete(tmpl)
+    db.commit()
+    from app.services.po_scheduler import scheduler
+    if scheduler.get_job(slot_id):
+        scheduler.remove_job(slot_id)
+    return {"status": "deleted", "slot_id": slot_id}

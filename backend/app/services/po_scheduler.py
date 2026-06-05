@@ -8,6 +8,7 @@ Expected receive date logic:
   04:00–23:59  → next calendar day, 10:00
 """
 from datetime import datetime, timedelta, time as dtime
+from typing import Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.database import SessionLocal
@@ -39,13 +40,13 @@ def _read_time(db, key: str, fallback: str) -> tuple[int, int]:
 
 # ── Core job ──────────────────────────────────────────────────────────────────
 
-def _fire_scheduled_po(slot_id: str):
+def _fire_scheduled_po(slot_id: str) -> Optional[str]:
     db = SessionLocal()
     try:
         tmpl = db.get(ScheduledPOTemplate, slot_id)
         if not tmpl or not tmpl.vendor_id or not tmpl.items:
             print(f"[PO Scheduler] No template / empty template for '{slot_id}', skipping")
-            return
+            return None
 
         fire_time = now()
 
@@ -55,7 +56,7 @@ def _fire_scheduled_po(slot_id: str):
             recv_date = fire_time.date()
         else:
             recv_date = fire_time.date() + timedelta(days=1)
-        recv_time_str = "10:00"
+        recv_time_str = tmpl.expected_receive_time or "10:00"
 
         total_amount = sum(i["ordered_qty"] * i["unit_cost"] for i in tmpl.items)
 
@@ -105,7 +106,7 @@ def _fire_scheduled_po(slot_id: str):
 
         vendor = db.get(Vendor, tmpl.vendor_id)
         vendor_name = vendor.name if vendor else tmpl.vendor_id
-        recv_str = f"{recv_date.strftime('%d %b')} 10:00 AM"
+        recv_str = f"{recv_date.strftime('%d %b')} {recv_time_str}"
 
         from app.services import notification_service
         notification_service.push(
@@ -114,6 +115,7 @@ def _fire_scheduled_po(slot_id: str):
             extra={"procurement_id": proc_id, "po_number": po_number},
         )
         print(f"[PO Scheduler] Auto-sent {po_number} → {vendor_name} ({slot_id})")
+        return po_number
     finally:
         db.close()
 
@@ -123,18 +125,37 @@ def _fire_scheduled_po(slot_id: str):
 def setup_jobs():
     db = SessionLocal()
     try:
-        dairy_h, dairy_m = _read_time(db, "po_dairy_evening_grace_time", "18:20")
+        default_h, default_m = _read_time(db, "po_dairy_evening_grace_time", "18:20")
+        templates = db.query(ScheduledPOTemplate).all()
     finally:
         db.close()
 
-    scheduler.add_job(
-        _fire_scheduled_po,
-        CronTrigger(hour=dairy_h, minute=dairy_m),
-        id="dairy_evening",
-        args=["dairy_evening"],
-        replace_existing=True,
-    )
-    print(f"[PO Scheduler] dairy_evening fires at {dairy_h:02d}:{dairy_m:02d}")
+    slot_ids = [t.slot_id for t in templates]
+
+    # Remove jobs whose templates were deleted
+    for job in scheduler.get_jobs():
+        if job.id not in slot_ids:
+            scheduler.remove_job(job.id)
+
+    # Add / update a job for every template using its own cron_time (fallback to global config)
+    for tmpl in templates:
+        if tmpl.cron_time:
+            try:
+                h, m = map(int, tmpl.cron_time.strip().split(":"))
+            except Exception:
+                h, m = default_h, default_m
+        else:
+            h, m = default_h, default_m
+
+        scheduler.add_job(
+            _fire_scheduled_po,
+            CronTrigger(hour=h, minute=m),
+            id=tmpl.slot_id,
+            args=[tmpl.slot_id],
+            replace_existing=True,
+        )
+        print(f"[PO Scheduler] {tmpl.slot_id} fires at {h:02d}:{m:02d}")
+    print(f"[PO Scheduler] {len(slot_ids)} job(s) scheduled")
 
 
 def get_next_run_times() -> list[dict]:
