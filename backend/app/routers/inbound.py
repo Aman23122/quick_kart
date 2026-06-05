@@ -10,7 +10,7 @@ from app.services.csv_processor import process_inbound_csv
 from app.services.qc_gate import validate_inbound
 from app.models import Procurement, ProcurementItem, ProductVariant, Vendor, Inventory, Product, Brand
 from app.services import notification_service
-from app.services.stock_monitor import check_and_alert
+from app.services.stock_monitor import check_and_alert, auto_resolve_if_restocked
 from app.utils.time_utils import format_ts, now
 from app.utils.id_gen import new_id
 from app.config import settings
@@ -148,6 +148,7 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
 
     # Run stock monitor for all approved variants
     for item in items:
+        auto_resolve_if_restocked(db, item.variant_id)
         check_and_alert(db, item.variant_id)
 
     notification_service.push(
