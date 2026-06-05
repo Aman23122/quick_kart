@@ -11,7 +11,7 @@ from app.services.fefo_engine import allocate, preview_allocate
 from app.services.shelf_life_checker import check_dispatch_block
 from app.services.stock_monitor import check_and_alert
 from app.services import notification_service
-from app.models import SalesOrder, OrderLineItem, ProductVariant, Product, Brand
+from app.models import SalesOrder, OrderLineItem, ProductVariant, Product, Brand, AlertLog
 from app.utils.time_utils import format_ts, now
 from app.utils.id_gen import new_id
 from app.config import settings
@@ -175,6 +175,34 @@ def get_pending_outbound(db: Session = Depends(get_db)):
     return {"total": len(result), "data": result}
 
 
+def _upsert_alert(db: Session, variant_id: str, alert_type: str, current_qty: int, threshold_qty: int, message: str) -> None:
+    """Create or refresh an unresolved alert of the given type for this variant."""
+    existing = (
+        db.query(AlertLog)
+        .filter(AlertLog.variant_id == variant_id, AlertLog.alert_type == alert_type, AlertLog.is_resolved == False)
+        .first()
+    )
+    if existing:
+        existing.current_qty = current_qty
+        existing.threshold_qty = threshold_qty
+        existing.message = message
+        existing.created_at = now()
+    else:
+        db.add(AlertLog(
+            alert_id=new_id(),
+            threshold_id=None,
+            variant_id=variant_id,
+            fulfillment_center_id=FC_ID,
+            alert_type=alert_type,
+            current_qty=current_qty,
+            threshold_qty=threshold_qty,
+            message=message,
+            is_resolved=False,
+            created_at=now(),
+        ))
+    db.commit()
+
+
 @router.post("/{order_id}/approve")
 def approve_outbound(order_id: str, db: Session = Depends(get_db)):
     """Approve a pending outbound order — runs FEFO and deducts inventory."""
@@ -200,6 +228,8 @@ def approve_outbound(order_id: str, db: Session = Depends(get_db)):
                 ntype="dispatch_blocked",
                 variant_id=line.variant_id,
             )
+            _upsert_alert(db, line.variant_id, "dispatch_blocked", line.quantity, 0,
+                          f"Dispatch blocked for order {order_id[:8]}: {shelf.reason}")
             dispatch_summary.append({"variant_id": line.variant_id, "status": "blocked", "reason": shelf.reason})
             continue
 
@@ -212,6 +242,10 @@ def approve_outbound(order_id: str, db: Session = Depends(get_db)):
         line.quantity = fefo.qty_fulfilled
         line.total_price = round(fefo.qty_fulfilled * float(line.unit_price), 2)
         total += fefo.qty_fulfilled * float(line.unit_price)
+
+        if fefo.shortage > 0:
+            _upsert_alert(db, line.variant_id, "stock_shortage", fefo.qty_fulfilled, line.quantity,
+                          f"Stock shortage for order {order_id[:8]}: requested {line.quantity}, fulfilled {fefo.qty_fulfilled}, short by {fefo.shortage}.")
 
         dispatch_summary.append({
             "variant_id": line.variant_id,

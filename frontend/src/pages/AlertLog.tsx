@@ -15,6 +15,7 @@ const ALERT_TYPES = [
   { value: 'wastage_risk', label: 'Wastage Risk' },
   { value: 'temp_rejection', label: 'Temp Rejection' },
   { value: 'dispatch_blocked', label: 'Dispatch Blocked' },
+  { value: 'stock_shortage', label: 'Stock Shortage' },
 ]
 
 export default function AlertLog() {
