@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Clock, ClipboardList, Plus, Send, Package, ArrowRight, Edit3, Trash2 } from 'lucide-react'
+import { Clock, ClipboardList, Plus, Package, ArrowRight, Edit3, Trash2 } from 'lucide-react'
 import {
-  getSchedule, getOpenPOs, markPOSent, deletePO,
+  getSchedule, getOpenPOs, deletePO,
   getTemplates, deleteTemplate, type OpenPO, type POTemplate,
 } from '@/services/poApi'
 import ManualPOForm from '@/components/po/ManualPOForm'
@@ -108,11 +108,6 @@ function ManualPOSection() {
     refetchInterval: 30_000,
   })
 
-  const sendMutation = useMutation({
-    mutationFn: markPOSent,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['po-open-monitor'] }),
-  })
-
   const deleteMutation = useMutation({
     mutationFn: deletePO,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['po-open-monitor'] }),
@@ -121,8 +116,8 @@ function ManualPOSection() {
   const pos: OpenPO[] = data?.data ?? []
 
   const statusColor: Record<string, string> = {
-    draft: 'bg-slate-100 text-slate-600',
     sent: 'bg-blue-100 text-blue-700',
+    received: 'bg-emerald-100 text-emerald-700',
   }
 
   return (
@@ -195,15 +190,6 @@ function ManualPOSection() {
               </div>
 
               <div className="flex gap-2 mt-auto">
-                {po.status === 'draft' && (
-                  <button
-                    onClick={() => sendMutation.mutate(po.procurement_id)}
-                    disabled={sendMutation.isPending}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-                  >
-                    <Send size={12} /> Mark Sent
-                  </button>
-                )}
                 <button
                   onClick={() => navigate(`/stock-entry?po=${po.procurement_id}`)}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700"

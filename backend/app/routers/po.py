@@ -65,7 +65,7 @@ def create_manual_po(payload: ManualPOPayload, db: Session = Depends(get_db)):
         fulfillment_center_id=FC_ID,
         vendor_invoice_number=None,
         po_number=po_number,
-        status="draft",
+        status="sent",
         total_amount=total_amount,
         expected_receive_date=exp_date,
         expected_receive_time=payload.expected_receive_time or None,
@@ -90,7 +90,23 @@ def create_manual_po(payload: ManualPOPayload, db: Session = Depends(get_db)):
         ))
 
     db.commit()
-    return {"procurement_id": proc_id, "po_number": po_number, "status": "draft"}
+
+    item_labels = []
+    for item in payload.items:
+        variant = db.get(ProductVariant, item.variant_id)
+        product = db.get(Product, variant.product_id) if variant else None
+        p_name = product.product_name if product else item.variant_id
+        v_name = variant.variant_name if variant else ""
+        item_labels.append(f"{p_name} — {v_name}" if v_name else p_name)
+
+    from app.services import notification_service
+    notification_service.push(
+        message=f"PO Created → {vendor.name} | {po_number} | {len(payload.items)} item(s)",
+        ntype="po_created",
+        extra={"procurement_id": proc_id, "po_number": po_number},
+    )
+
+    return {"procurement_id": proc_id, "po_number": po_number, "status": "sent"}
 
 
 @router.get("/open")
