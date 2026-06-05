@@ -114,7 +114,7 @@ def get_open_pos(db: Session = Depends(get_db)):
     """List open Procurements (draft/sent) for Stock Entry dropdown."""
     rows = (
         db.query(Procurement)
-        .filter(Procurement.status.in_(["draft", "sent"]))
+        .filter(Procurement.status.in_(["draft", "sent", "pending_approval"]))
         .order_by(desc(Procurement.created_at))
         .all()
     )

@@ -117,7 +117,14 @@ function ManualPOSection() {
 
   const statusColor: Record<string, string> = {
     sent: 'bg-blue-100 text-blue-700',
+    pending_approval: 'bg-amber-100 text-amber-700',
     received: 'bg-emerald-100 text-emerald-700',
+  }
+
+  const statusLabel: Record<string, string> = {
+    sent: 'Sent',
+    pending_approval: 'Waiting Approval',
+    received: 'Received',
   }
 
   return (
@@ -160,8 +167,8 @@ function ManualPOSection() {
                   <p className="font-mono text-xs font-semibold text-slate-700">{po.po_number}</p>
                   <p className="text-sm font-medium text-slate-800 mt-0.5">{po.vendor_name}</p>
                 </div>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full uppercase ${statusColor[po.status] ?? 'bg-slate-100 text-slate-500'}`}>
-                  {po.status}
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor[po.status] ?? 'bg-slate-100 text-slate-500'}`}>
+                  {statusLabel[po.status] ?? po.status}
                 </span>
               </div>
 
@@ -190,12 +197,21 @@ function ManualPOSection() {
               </div>
 
               <div className="flex gap-2 mt-auto">
-                <button
-                  onClick={() => navigate(`/stock-entry?po=${po.procurement_id}`)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  <ArrowRight size={12} /> Receive Stock
-                </button>
+                {po.status === 'pending_approval' ? (
+                  <button
+                    onClick={() => navigate(`/inbound?po=${po.po_number}`)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg bg-amber-500 text-white hover:bg-amber-600"
+                  >
+                    <ArrowRight size={12} /> View Approval
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => navigate(`/stock-entry?po=${po.procurement_id}`)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    <ArrowRight size={12} /> Receive Stock
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     if (confirm(`Delete ${po.po_number}? This cannot be undone.`))

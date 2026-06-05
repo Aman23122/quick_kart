@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { CheckCircle, XCircle, Clock, Thermometer, ShieldAlert, Timer } from 'lucide-react'
 import {
   getInboundLedger,
@@ -100,8 +101,9 @@ const ledgerColumns: ColumnDef<InboundRow>[] = [
   },
 ]
 
-function PendingApprovalPanel() {
+function PendingApprovalPanel({ highlightPO }: { highlightPO?: string }) {
   const queryClient = useQueryClient()
+  const highlightRef = useRef<HTMLTableRowElement>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['pending-approvals'],
@@ -128,6 +130,13 @@ function PendingApprovalPanel() {
 
   const items: PendingItem[] = data?.data ?? []
   const total = data?.total ?? 0
+
+  // Scroll to first highlighted row once data loads
+  useEffect(() => {
+    if (highlightPO && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlightPO, items.length])
 
   if (!isLoading && total === 0) return null
 
@@ -169,11 +178,17 @@ function PendingApprovalPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {items.map((item) => {
+              {items.map((item, idx) => {
                 const isBusy =
                   approveMutation.isPending || rejectMutation.isPending
+                const isHighlighted = !!highlightPO && item.po_number === highlightPO
+                const isFirstHighlighted = isHighlighted && items.findIndex(i => i.po_number === highlightPO) === idx
                 return (
-                  <tr key={item.procurement_item_id} className="hover:bg-slate-50/60 transition-colors">
+                  <tr
+                    key={item.procurement_item_id}
+                    ref={isFirstHighlighted ? highlightRef : undefined}
+                    className={`transition-colors ${isHighlighted ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'hover:bg-slate-50/60'}`}
+                  >
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">
                       {item.po_number}
                     </td>
@@ -250,6 +265,9 @@ function PendingApprovalPanel() {
 }
 
 export default function InboundLedger() {
+  const [searchParams] = useSearchParams()
+  const highlightPO = searchParams.get('po') ?? undefined
+
   const [page, setPage] = useState(1)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -270,7 +288,7 @@ export default function InboundLedger() {
   return (
     <div className="space-y-6">
       {/* Pending approvals — hidden when empty */}
-      <PendingApprovalPanel />
+      <PendingApprovalPanel highlightPO={highlightPO} />
 
       {/* Ledger */}
       <div className="space-y-4">
