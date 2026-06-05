@@ -263,6 +263,15 @@ export default function POMonitor() {
   const getNextRun = (slotId: string): string | undefined =>
     (scheduleData?.jobs ?? []).find((j) => j.job_id === slotId)?.next_run
 
+  const enrichedJobs = (scheduleData?.jobs ?? []).map((job) => {
+    const tmpl = templates.find((t) => t.slot_id === job.job_id)
+    return {
+      ...job,
+      label: tmpl?.label ?? job.job_id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      vendor_name: tmpl?.vendor_name ?? '',
+    }
+  })
+
   return (
     <div className="space-y-8">
       {/* Manual POs */}
@@ -311,7 +320,7 @@ export default function POMonitor() {
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
           Scheduler Jobs
         </h2>
-        <SchedulerLog jobs={scheduleData?.jobs ?? []} />
+        <SchedulerLog jobs={enrichedJobs} />
       </div>
 
       {/* Template edit modal */}
