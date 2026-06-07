@@ -225,7 +225,14 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-50 text-amber-600">
-                              <Clock size={9} /> by {new Date(batch.dispatch_cutoff).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                              <Clock size={9} /> {(() => {
+                                const cutoffDate = new Date(batch.dispatch_cutoff)
+                                const isToday = cutoffDate.toDateString() === new Date().toDateString()
+                                const timeStr = cutoffDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                                if (isToday) return `by ${timeStr}`
+                                const dateStr = cutoffDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                                return `by ${dateStr}, ${timeStr}`
+                              })()}
                             </span>
                           )
                         )}
