@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Numeric, String, Text, Date, TIMESTAMP, func
+from sqlalchemy import Column, Integer, Numeric, String, Text, Date, TIMESTAMP, DateTime, func
 from app.database import Base
 
 
@@ -15,6 +15,7 @@ class Inventory(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     sell_before_date = Column(Date, nullable=False)
     batch_no = Column(String(100), nullable=True)
+    dispatch_cutoff = Column(DateTime, nullable=True)
 
 
 class InventoryTransaction(Base):

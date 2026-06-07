@@ -37,6 +37,8 @@ class PreviewBatch:
     days_until_expiry: Optional[int]
     batch_no: Optional[str]
     temperature_measured: Optional[int]
+    dispatch_cutoff: Optional[str]
+    dispatch_blocked: bool
 
 
 @dataclass
@@ -48,6 +50,22 @@ class FEFOPreview:
     batches: list[PreviewBatch] = field(default_factory=list)
 
 
+def _dispatchable_batches(db: Session, variant_id: str, fulfillment_center_id: str):
+    """Return in-stock, non-expired batches that are within their dispatch window."""
+    current = now()
+    return (
+        db.query(Inventory)
+        .filter(
+            Inventory.variant_id == variant_id,
+            Inventory.fulfillment_center_id == fulfillment_center_id,
+            Inventory.qty > 0,
+            Inventory.sell_before_date >= date.today(),
+        )
+        .order_by(asc(Inventory.sell_before_date))
+        .all()
+    ), current
+
+
 def allocate(
     db: Session,
     variant_id: str,
@@ -57,18 +75,8 @@ def allocate(
     reference_id: str,
     created_by: str = "system",
 ) -> FEFOResult:
-    """Deduct stock from oldest sell_before_date batches first."""
-    batches = (
-        db.query(Inventory)
-        .filter(
-            Inventory.variant_id == variant_id,
-            Inventory.fulfillment_center_id == fulfillment_center_id,
-            Inventory.qty > 0,
-            Inventory.sell_before_date >= date.today(),  # expired batches skip
-        )
-        .order_by(asc(Inventory.sell_before_date))
-        .all()
-    )
+    """Deduct stock from oldest sell_before_date batches first, skipping dispatch-window-expired batches."""
+    batches, current = _dispatchable_batches(db, variant_id, fulfillment_center_id)
 
     remaining = qty_requested
     allocations: list[AllocationLine] = []
@@ -76,6 +84,9 @@ def allocate(
     for batch in batches:
         if remaining <= 0:
             break
+        # Skip batches whose dispatch window has closed
+        if batch.dispatch_cutoff is not None and batch.dispatch_cutoff < current:
+            continue
 
         deduct = min(batch.qty, remaining)
         qty_before = batch.qty
@@ -93,7 +104,7 @@ def allocate(
             qty_after=batch.qty,
             reference_type=reference_type,
             reference_id=reference_id,
-            batch_no=None,
+            batch_no=batch.batch_no,
             notes=f"FEFO allocation: {deduct} units from batch expiring {batch.sell_before_date}",
             created_by=created_by,
             created_at=now(),
@@ -124,40 +135,20 @@ def preview_allocate(
     qty_requested: int,
 ) -> FEFOPreview:
     """Read-only FEFO simulation — no DB writes, no inventory deduction."""
-    from app.models import ProcurementItem
-
-    batches = (
-        db.query(Inventory)
-        .filter(
-            Inventory.variant_id == variant_id,
-            Inventory.fulfillment_center_id == fulfillment_center_id,
-            Inventory.qty > 0,
-            Inventory.sell_before_date >= date.today(),
-        )
-        .order_by(asc(Inventory.sell_before_date))
-        .all()
-    )
+    batches, current = _dispatchable_batches(db, variant_id, fulfillment_center_id)
 
     remaining = qty_requested
     preview_batches: list[PreviewBatch] = []
 
     for batch in batches:
-        if remaining <= 0:
-            break
-        take = min(batch.qty, remaining)
-        remaining -= take
+        blocked = batch.dispatch_cutoff is not None and batch.dispatch_cutoff < current
+        if remaining > 0 and not blocked:
+            take = min(batch.qty, remaining)
+            remaining -= take
+        else:
+            take = 0
 
         days_left = (batch.sell_before_date - date.today()).days if batch.sell_before_date else None
-
-        proc_item = (
-            db.query(ProcurementItem)
-            .filter(
-                ProcurementItem.variant_id == variant_id,
-                ProcurementItem.sell_before_date == batch.sell_before_date,
-            )
-            .order_by(ProcurementItem.created_at.asc())
-            .first()
-        )
 
         preview_batches.append(PreviewBatch(
             inventory_id=batch.inventory_id,
@@ -166,8 +157,10 @@ def preview_allocate(
             qty_available=batch.qty,
             qty_to_dispatch=take,
             days_until_expiry=days_left,
-            batch_no=proc_item.batch_no if proc_item else None,
-            temperature_measured=proc_item.temperature_measured if proc_item else None,
+            batch_no=batch.batch_no,
+            temperature_measured=None,
+            dispatch_cutoff=batch.dispatch_cutoff.isoformat() if batch.dispatch_cutoff else None,
+            dispatch_blocked=blocked,
         ))
 
     qty_fulfilled = qty_requested - remaining

@@ -221,18 +221,6 @@ def approve_outbound(order_id: str, db: Session = Depends(get_db)):
     total = 0.0
     dispatch_summary = []
     for line in lines:
-        shelf = check_dispatch_block(db, line.variant_id)
-        if shelf.blocked:
-            notification_service.push(
-                f"Dispatch BLOCKED for variant {line.variant_id}: {shelf.reason}",
-                ntype="dispatch_blocked",
-                variant_id=line.variant_id,
-            )
-            _upsert_alert(db, line.variant_id, "dispatch_blocked", line.quantity, 0,
-                          f"Dispatch blocked for order {order_id[:8]}: {shelf.reason}")
-            dispatch_summary.append({"variant_id": line.variant_id, "status": "blocked", "reason": shelf.reason})
-            continue
-
         fefo = allocate(
             db, line.variant_id, FC_ID, line.quantity,
             reference_type="sales_order",
@@ -244,8 +232,18 @@ def approve_outbound(order_id: str, db: Session = Depends(get_db)):
         total += fefo.qty_fulfilled * float(line.unit_price)
 
         if fefo.shortage > 0:
-            _upsert_alert(db, line.variant_id, "stock_shortage", fefo.qty_fulfilled, line.quantity,
-                          f"Stock shortage for order {order_id[:8]}: requested {line.quantity}, fulfilled {fefo.qty_fulfilled}, short by {fefo.shortage}.")
+            shelf = check_dispatch_block(db, line.variant_id)
+            if shelf.blocked:
+                notification_service.push(
+                    f"Dispatch BLOCKED for variant {line.variant_id}: {shelf.reason}",
+                    ntype="dispatch_blocked",
+                    variant_id=line.variant_id,
+                )
+                _upsert_alert(db, line.variant_id, "dispatch_blocked", fefo.qty_fulfilled, line.quantity,
+                              f"Dispatch blocked for order {order_id[:8]}: {shelf.reason}")
+            else:
+                _upsert_alert(db, line.variant_id, "stock_shortage", fefo.qty_fulfilled, line.quantity,
+                              f"Stock shortage for order {order_id[:8]}: requested {line.quantity}, fulfilled {fefo.qty_fulfilled}, short by {fefo.shortage}.")
 
         dispatch_summary.append({
             "variant_id": line.variant_id,

@@ -75,6 +75,10 @@ def get_inventory_grid(
 
         days_left = (r.sell_before_date - date.today()).days if r.sell_before_date else None
 
+        from datetime import datetime as _dt
+        cutoff = r.dispatch_cutoff
+        cutoff_expired = cutoff is not None and cutoff < _dt.now()
+
         agg[vid]["batches"].append({
             "inventory_id": r.inventory_id,
             "batch_no": r.batch_no or None,
@@ -83,6 +87,8 @@ def get_inventory_grid(
             "expiry_date": str(r.expiry_date) if r.expiry_date else None,
             "days_until_expiry": days_left,
             "created_at": format_ts(r.created_at),
+            "dispatch_cutoff": cutoff.isoformat() if cutoff else None,
+            "dispatch_cutoff_expired": cutoff_expired,
         })
 
     result = []

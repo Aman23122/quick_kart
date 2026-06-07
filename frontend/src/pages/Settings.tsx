@@ -33,10 +33,17 @@ const CONFIG_GROUPS: {
     color: 'text-blue-600 bg-blue-50',
   },
   {
-    title: 'Shelf-Life Dispatch Rules',
-    description: 'Maximum hours/days before dispatch is blocked',
+    title: 'Dispatch Windows — Per Product',
+    description: 'Minutes after inbound approval within which each product type can be dispatched. First matching rule wins; generic dairy is the fallback.',
     icon: Clock,
-    keys: ['milk_max_hours', 'paneer_curd_bread_batter_max_days', 'butter_max_days'],
+    keys: [
+      'dispatch_window_milk_min',
+      'dispatch_window_paneer_curd_min',
+      'dispatch_window_bread_batter_min',
+      'dispatch_window_butter_min',
+      'dispatch_window_meat_min',
+      'dairy_dispatch_window_minutes',
+    ],
     color: 'text-amber-600 bg-amber-50',
   },
   {

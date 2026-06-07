@@ -8,12 +8,59 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.services.csv_processor import process_inbound_csv
 from app.services.qc_gate import validate_inbound
-from app.models import Procurement, ProcurementItem, ProductVariant, Vendor, Inventory, Product, Brand
+from datetime import timedelta
+from app.models import Procurement, ProcurementItem, ProductVariant, Vendor, Inventory, Product, Brand, SystemConfig
 from app.services import notification_service
 from app.services.stock_monitor import check_and_alert, auto_resolve_if_restocked
 from app.utils.time_utils import format_ts, now
 from app.utils.id_gen import new_id
 from app.config import settings
+
+# (keywords, config_key) — first match wins; most specific rules listed first
+_DISPATCH_RULES: list[tuple[tuple[str, ...], str]] = [
+    (("milk",),                                              "dispatch_window_milk_min"),
+    (("paneer", "curd", "yoghurt", "yogurt", "dahi"),        "dispatch_window_paneer_curd_min"),
+    (("bread",),                                             "dispatch_window_bread_batter_min"),
+    (("batter",),                                            "dispatch_window_bread_batter_min"),
+    (("butter",),                                            "dispatch_window_butter_min"),
+    (("meat", "chicken", "mutton", "beef", "lamb", "fish"),  "dispatch_window_meat_min"),
+]
+# Fallback config key for anything that is generically dairy/fresh/frozen but didn't match above
+_DAIRY_FALLBACK_KEYWORDS = ("dairy", "cheese", "fresh", "fruit", "vegetable", "veg", "cut", "frozen")
+_DAIRY_FALLBACK_KEY = "dairy_dispatch_window_minutes"
+
+
+def _get_dispatch_minutes(db: Session, variant_id: str) -> int | None:
+    """Return dispatch window in minutes for this variant, or None if no window applies."""
+    variant = db.get(ProductVariant, variant_id)
+    if not variant:
+        return None
+    product = db.get(Product, variant.product_id)
+    if not product:
+        return None
+    # search both product name and product type so "Amul Fresh Milk" matches "milk" in name
+    haystack = f"{(product.product_name or '')} {(product.type or '')}".lower()
+
+    for keywords, config_key in _DISPATCH_RULES:
+        if any(kw in haystack for kw in keywords):
+            row = db.get(SystemConfig, config_key)
+            if row and row.config_value:
+                return int(row.config_value)
+
+    # generic dairy/fresh fallback
+    if any(k in haystack for k in _DAIRY_FALLBACK_KEYWORDS):
+        row = db.get(SystemConfig, _DAIRY_FALLBACK_KEY)
+        if row and row.config_value:
+            return int(row.config_value)
+
+    return None
+
+
+def _build_dispatch_cutoff(db: Session, variant_id: str) -> datetime | None:
+    minutes = _get_dispatch_minutes(db, variant_id)
+    if minutes is None:
+        return None
+    return now() + timedelta(minutes=minutes)
 
 
 class ReceiveItemDetail(BaseModel):
@@ -129,6 +176,7 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
     )
 
     for item in items:
+        cutoff = _build_dispatch_cutoff(db, item.variant_id)
         db.add(Inventory(
             inventory_id=new_id(),
             variant_id=item.variant_id,
@@ -138,6 +186,7 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
             cost_price=item.unit_cost,
             sell_before_date=item.sell_before_date,
             batch_no=item.batch_no,
+            dispatch_cutoff=cutoff,
             created_at=now(),
             updated_at=now(),
         ))

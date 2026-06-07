@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings2, AlertTriangle, Calendar, Layers, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { Settings2, AlertTriangle, Calendar, Layers, ChevronDown, ChevronUp, Trash2, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { daysLabel } from '@/lib/utils'
 import { deleteBatch } from '@/services/inventoryApi'
@@ -13,6 +13,8 @@ export interface BatchDetail {
   expiry_date: string | null
   days_until_expiry: number | null
   created_at: string
+  dispatch_cutoff: string | null
+  dispatch_cutoff_expired: boolean
 }
 
 export interface InventoryItem {
@@ -211,11 +213,22 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
                   >
                     {/* Batch no or fallback */}
                     <td className="py-1.5 px-2">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={cn('w-2 h-2 rounded-full flex-shrink-0', batchRowDot(batch.days_until_expiry))} />
                         <span className="font-medium text-slate-700">
                           {batch.batch_no ?? `Batch ${idx + 1}`}
                         </span>
+                        {batch.dispatch_cutoff && (
+                          batch.dispatch_cutoff_expired ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-rose-100 text-rose-600">
+                              <Clock size={9} /> Dispatch Blocked
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-50 text-amber-600">
+                              <Clock size={9} /> by {new Date(batch.dispatch_cutoff).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )
+                        )}
                       </div>
                     </td>
                     {/* Qty */}

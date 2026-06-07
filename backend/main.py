@@ -21,6 +21,8 @@ def _run_migrations():
         "ALTER TABLE scheduled_po_template ADD COLUMN label VARCHAR(100) NULL",
         "ALTER TABLE scheduled_po_template ADD COLUMN cron_time VARCHAR(5) NULL",
         "ALTER TABLE scheduled_po_template ADD COLUMN expected_receive_time VARCHAR(5) NULL",
+        "ALTER TABLE inventory ADD COLUMN batch_no VARCHAR(100) NULL",
+        "ALTER TABLE inventory ADD COLUMN dispatch_cutoff DATETIME NULL",
     ]
     with engine.connect() as conn:
         for stmt in migrations:
@@ -42,6 +44,26 @@ async def lifespan(app: FastAPI):
 
     # Start APScheduler
     setup_jobs()
+
+    # Check dispatch cutoff expiry every 15 minutes
+    from app.services.shelf_life_checker import check_dispatch_cutoff_alerts
+    from app.database import SessionLocal
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    def _run_dispatch_cutoff_check():
+        db = SessionLocal()
+        try:
+            check_dispatch_cutoff_alerts(db)
+        finally:
+            db.close()
+
+    scheduler.add_job(
+        _run_dispatch_cutoff_check,
+        IntervalTrigger(minutes=15),
+        id="dispatch_cutoff_check",
+        replace_existing=True,
+    )
+
     scheduler.start()
     print(f"[Scheduler] Started with {len(scheduler.get_jobs())} jobs.")
 
