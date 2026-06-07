@@ -137,6 +137,7 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
             expiry_date=item.expiry_date,
             cost_price=item.unit_cost,
             sell_before_date=item.sell_before_date,
+            batch_no=item.batch_no,
             created_at=now(),
             updated_at=now(),
         ))

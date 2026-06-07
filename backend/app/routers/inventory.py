@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from pydantic import BaseModel
 from app.database import get_db
 from sqlalchemy import asc
-from app.models import Inventory, ProductVariant, Product, Brand, AlertThreshold, ProcurementItem
+from app.models import Inventory, ProductVariant, Product, Brand, AlertThreshold
 from app.utils.time_utils import format_ts, now
 from app.config import settings
 
@@ -73,21 +73,11 @@ def get_inventory_grid(
         ):
             agg[vid]["oldest_created_at"] = r.created_at
 
-        # Fetch batch_no from procurement_item via variant_id + sell_before_date
-        proc_item = (
-            db.query(ProcurementItem)
-            .filter(
-                ProcurementItem.variant_id == vid,
-                ProcurementItem.sell_before_date == r.sell_before_date,
-            )
-            .order_by(ProcurementItem.created_at.asc())
-            .first()
-        )
         days_left = (r.sell_before_date - date.today()).days if r.sell_before_date else None
 
         agg[vid]["batches"].append({
             "inventory_id": r.inventory_id,
-            "batch_no": proc_item.batch_no if proc_item and proc_item.batch_no else None,
+            "batch_no": r.batch_no or None,
             "qty": r.qty,
             "sell_before_date": str(r.sell_before_date) if r.sell_before_date else None,
             "expiry_date": str(r.expiry_date) if r.expiry_date else None,
