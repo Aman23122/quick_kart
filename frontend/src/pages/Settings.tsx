@@ -53,16 +53,6 @@ const CONFIG_GROUPS: {
     keys: ['fruits_veg_wastage_alert_days', 'low_stock_pct_threshold'],
     color: 'text-rose-600 bg-rose-50',
   },
-  {
-    title: 'PO Scheduler Times',
-    description: 'Grace (draft created) and fire (auto-sent) times for scheduled replenishment slots — format HH:MM, Asia/Kolkata',
-    icon: Clock,
-    keys: [
-      'po_dairy_evening_grace_time',
-      'po_meat_morning_grace_time',
-    ],
-    color: 'text-violet-600 bg-violet-50',
-  },
 ]
 
 interface ConfigRowItemProps {
