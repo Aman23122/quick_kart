@@ -200,7 +200,7 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
             </thead>
             <tbody className="divide-y divide-slate-50">
               {item.batches.map((batch, idx) => {
-                const isDeletable = batch.qty === 0 || (batch.days_until_expiry !== null && batch.days_until_expiry < 0)
+                const isDeletable = batch.qty === 0 || (batch.days_until_expiry !== null && batch.days_until_expiry < 0) || batch.dispatch_cutoff_expired
                 const isDeleting = deletingId === batch.inventory_id
                 return (
                   <tr
@@ -249,7 +249,7 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
                         <button
                           onClick={() => removeBatch(batch.inventory_id)}
                           disabled={isDeleting}
-                          title={batch.qty === 0 ? 'Delete empty batch' : 'Delete expired batch'}
+                          title={batch.qty === 0 ? 'Delete empty batch' : batch.dispatch_cutoff_expired ? 'Delete dispatch-blocked batch' : 'Delete expired batch'}
                           className="p-1 rounded text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors disabled:cursor-not-allowed"
                         >
                           <Trash2 size={13} />

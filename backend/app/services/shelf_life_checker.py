@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.models import Inventory, AlertLog
 from app.utils.id_gen import new_id
 from app.utils.time_utils import now
@@ -35,10 +36,30 @@ def check_dispatch_block(
     variant_id: str,
     procurement_item_id: str | None = None,
 ) -> ShelfLifeResult:
-    """Returns blocked=True if any active inventory batch has passed its dispatch_cutoff."""
+    """Returns blocked=True only if ALL available stock has passed its dispatch_cutoff.
+    If at least one valid batch exists (no cutoff or cutoff not expired), product is dispatchable."""
     fc_id = settings.FULFILLMENT_CENTER_ID
     current = datetime.now()
 
+    # If any batch can still be dispatched, the product is NOT blocked
+    dispatchable = (
+        db.query(Inventory)
+        .filter(
+            Inventory.variant_id == variant_id,
+            Inventory.fulfillment_center_id == fc_id,
+            Inventory.qty > 0,
+            Inventory.sell_before_date >= current.date(),
+            or_(
+                Inventory.dispatch_cutoff.is_(None),
+                Inventory.dispatch_cutoff >= current,
+            ),
+        )
+        .first()
+    )
+    if dispatchable:
+        return ShelfLifeResult(False)
+
+    # No dispatchable batch — check if blocked stock (expired window) is the reason
     blocked_batch = (
         db.query(Inventory)
         .filter(
@@ -58,7 +79,7 @@ def check_dispatch_block(
         return ShelfLifeResult(
             True,
             f"{product_name.capitalize()} dispatch window closed (cutoff: {cutoff_str}). "
-            f"{blocked_batch.qty} units cannot be dispatched."
+            f"All available stock is past its dispatch window."
         )
 
     return ShelfLifeResult(False)

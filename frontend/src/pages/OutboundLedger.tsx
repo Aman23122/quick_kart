@@ -131,12 +131,27 @@ function LineItemRow({ line }: { line: PendingOrderLine }) {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {preview.batches.map((batch) => (
-                  <tr key={batch.inventory_id} className="hover:bg-slate-50">
-                    <td className="py-2 font-mono">{batch.batch_no ?? '—'}</td>
+                  <tr
+                    key={batch.inventory_id}
+                    className={batch.dispatch_blocked ? 'bg-rose-50/60' : 'hover:bg-slate-50'}
+                  >
+                    <td className="py-2 font-mono">
+                      <span className={batch.dispatch_blocked ? 'text-rose-500' : ''}>
+                        {batch.batch_no ?? '—'}
+                      </span>
+                    </td>
                     <td className="py-2 text-slate-600">{batch.sell_before_date}</td>
                     <td className="py-2 text-slate-500">{batch.expiry_date ?? '—'}</td>
                     <td className="py-2 text-right">{batch.qty_available}</td>
-                    <td className="py-2 text-right font-bold text-blue-700">{batch.qty_to_dispatch}</td>
+                    <td className="py-2 text-right">
+                      {batch.dispatch_blocked ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded bg-rose-100 text-rose-600">
+                          <ShieldAlert size={10} /> BLOCK
+                        </span>
+                      ) : (
+                        <span className="font-bold text-blue-700">{batch.qty_to_dispatch}</span>
+                      )}
+                    </td>
                     <td className="py-2 text-center">
                       <span
                         className={`px-1.5 py-0.5 rounded font-semibold ${

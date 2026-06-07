@@ -158,6 +158,8 @@ def get_pending_outbound(db: Session = Depends(get_db)):
                             "qty_to_dispatch": b.qty_to_dispatch,
                             "days_until_expiry": b.days_until_expiry,
                             "temperature_measured": b.temperature_measured,
+                            "dispatch_blocked": b.dispatch_blocked,
+                            "dispatch_cutoff": b.dispatch_cutoff,
                         }
                         for b in preview.batches
                     ],

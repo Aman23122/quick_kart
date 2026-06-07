@@ -38,6 +38,8 @@ export interface FEFOBatch {
   qty_to_dispatch: number
   days_until_expiry: number | null
   temperature_measured: number | null
+  dispatch_blocked: boolean
+  dispatch_cutoff: string | null
 }
 
 export interface PendingOrderLine {
