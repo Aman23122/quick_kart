@@ -23,11 +23,15 @@ class ThresholdUpdate(BaseModel):
     expiry_alert_days: Optional[int] = None
 
 
-def _card_status(qty: int, min_level: int, max_level: Optional[int], sell_before: Optional[date], blocked: bool) -> str:
-    if blocked or qty == 0:
+def _card_status(
+    dispatchable_qty: int,
+    max_level: Optional[int],
+    earliest_dispatchable_sell_before: Optional[date],
+) -> str:
+    if dispatchable_qty == 0:
         return "red"
-    pct = (qty / max_level * 100) if max_level else 100
-    days_left = (sell_before - date.today()).days if sell_before else 999
+    pct = (dispatchable_qty / max_level * 100) if max_level else 100
+    days_left = (earliest_dispatchable_sell_before - date.today()).days if earliest_dispatchable_sell_before else 999
     if pct <= 20 or days_left <= 2:
         return "orange"
     return "green"
@@ -47,13 +51,19 @@ def get_inventory_grid(
         .all()
     )
 
+    from datetime import datetime as _dt
+    _now = _dt.now()
+    _today = date.today()
+
     agg: dict = {}
     for r in rows:
         vid = r.variant_id
         if vid not in agg:
             agg[vid] = {
                 "total_qty": 0,
+                "dispatchable_qty": 0,
                 "earliest_sell_before": r.sell_before_date,
+                "earliest_dispatchable_sell_before": None,
                 "oldest_created_at": r.created_at,
                 "batch_count": 0,
                 "batches": [],
@@ -73,11 +83,21 @@ def get_inventory_grid(
         ):
             agg[vid]["oldest_created_at"] = r.created_at
 
-        days_left = (r.sell_before_date - date.today()).days if r.sell_before_date else None
-
-        from datetime import datetime as _dt
         cutoff = r.dispatch_cutoff
-        cutoff_expired = cutoff is not None and cutoff < _dt.now()
+        cutoff_expired = cutoff is not None and cutoff < _now
+        sell_expired = r.sell_before_date is not None and r.sell_before_date < _today
+
+        # A batch is dispatchable if it has stock, hasn't passed sell_before, and is within dispatch window
+        is_dispatchable = r.qty > 0 and not sell_expired and not cutoff_expired
+        if is_dispatchable:
+            agg[vid]["dispatchable_qty"] += r.qty
+            if r.sell_before_date and (
+                agg[vid]["earliest_dispatchable_sell_before"] is None
+                or r.sell_before_date < agg[vid]["earliest_dispatchable_sell_before"]
+            ):
+                agg[vid]["earliest_dispatchable_sell_before"] = r.sell_before_date
+
+        days_left = (r.sell_before_date - _today).days if r.sell_before_date else None
 
         agg[vid]["batches"].append({
             "inventory_id": r.inventory_id,
@@ -118,12 +138,14 @@ def get_inventory_grid(
         max_level = threshold.max_stock_level if threshold else None
         sell_before = agg_data["earliest_sell_before"]
         days_left = (sell_before - date.today()).days if sell_before else None
+        dispatchable_qty = agg_data["dispatchable_qty"]
+        earliest_dispatchable_sell_before = agg_data["earliest_dispatchable_sell_before"]
 
         from app.services.shelf_life_checker import check_dispatch_block
         shelf = check_dispatch_block(db, vid)
         blocked = shelf.blocked
 
-        card_status = _card_status(qty, min_level, max_level, sell_before, blocked)
+        card_status = _card_status(dispatchable_qty, max_level, earliest_dispatchable_sell_before)
 
         if status_filter and card_status != status_filter:
             continue
@@ -163,14 +185,16 @@ def delete_batch(inventory_id: str, db: Session = Depends(get_db)):
     if not batch:
         raise HTTPException(404, "Batch not found")
 
+    from datetime import datetime as _dt
     today = date.today()
     is_expired = batch.sell_before_date and batch.sell_before_date < today
     is_empty = batch.qty == 0
+    is_dispatch_blocked = batch.dispatch_cutoff is not None and batch.dispatch_cutoff < _dt.now()
 
-    if not is_expired and not is_empty:
+    if not is_expired and not is_empty and not is_dispatch_blocked:
         raise HTTPException(
             400,
-            "Batch can only be deleted if quantity is 0 or it is expired"
+            "Batch can only be deleted if quantity is 0, it is expired, or its dispatch window has closed"
         )
 
     db.query(InventoryTransaction).filter(
