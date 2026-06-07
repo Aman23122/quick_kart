@@ -10,6 +10,7 @@ import {
   Bell,
   Settings,
   Zap,
+  Box,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +21,7 @@ const navItems = [
   { to: '/sales-order', label: 'Sales Order', icon: ShoppingCart },
   { to: '/outbound', label: 'Outbound', icon: PackageOpen },
   { to: '/inventory', label: 'Inventory', icon: Warehouse },
+  { to: '/products', label: 'Products', icon: Box },
   { to: '/po', label: 'PO Monitor', icon: ClipboardList },
   { to: '/alerts', label: 'Alert Log', icon: Bell },
   { to: '/settings', label: 'Settings', icon: Settings },

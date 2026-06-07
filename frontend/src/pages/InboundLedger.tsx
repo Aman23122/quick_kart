@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { CheckCircle, XCircle, Clock, Thermometer, ShieldAlert, Timer } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Thermometer, ShieldAlert, Timer, ShieldCheck } from 'lucide-react'
 import {
   getInboundLedger,
   getPendingApprovals,
@@ -265,6 +265,7 @@ function PendingApprovalPanel({ highlightPO }: { highlightPO?: string }) {
 }
 
 export default function InboundLedger() {
+  const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const highlightPO = searchParams.get('po') ?? undefined
 
@@ -284,6 +285,36 @@ export default function InboundLedger() {
         status: status || undefined,
       }).then((r) => r.data),
   })
+
+  const forceApproveMutation = useMutation({
+    mutationFn: (procurementId: string) => approveInbound(procurementId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inbound-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory-grid'] })
+    },
+  })
+
+  const ledgerColumnsWithActions: ColumnDef<InboundRow>[] = [
+    ...ledgerColumns,
+    {
+      key: 'actions',
+      header: '',
+      render: (r) => {
+        if (r.status !== 'rejected') return null
+        return (
+          <button
+            disabled={forceApproveMutation.isPending}
+            onClick={() => r.procurement_id && forceApproveMutation.mutate(r.procurement_id)}
+            title="Force approve — bypass QC and add to inventory"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            <ShieldCheck size={12} />
+            Force Approve
+          </button>
+        )
+      },
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -330,7 +361,7 @@ export default function InboundLedger() {
         </div>
 
         <DataTable
-          columns={ledgerColumns}
+          columns={ledgerColumnsWithActions}
           data={(data?.data as InboundRow[]) ?? []}
           loading={isLoading}
           totalCount={data?.total ?? 0}

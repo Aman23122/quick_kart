@@ -177,7 +177,6 @@ def delete_batch(inventory_id: str, db: Session = Depends(get_db)):
             "Batch can only be deleted if quantity is 0 or it is expired"
         )
 
-    # Null out inventory_id on related transactions (keep audit trail)
     db.query(InventoryTransaction).filter(
         InventoryTransaction.inventory_id == inventory_id
     ).update({"inventory_id": None})

@@ -11,6 +11,7 @@ const routeTitles: Record<string, string> = {
   '/inventory': 'Inventory Grid',
   '/po': 'PO Monitor',
   '/alerts': 'Alert Log',
+  '/products': 'Products',
   '/settings': 'Settings',
 }
 

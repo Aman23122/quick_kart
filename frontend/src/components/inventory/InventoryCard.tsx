@@ -88,6 +88,7 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inventory-grid'] }),
   })
 
+
   return (
     <div
       className={cn(

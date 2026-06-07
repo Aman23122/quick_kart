@@ -20,7 +20,9 @@
       "Bash(curl -s -X POST http://localhost:8000/api/outbound/manual -H 'Content-Type: application/json' -d '{\"customer_name\":\"Rahul Sharma\",\"notes\":\"urgent\",\"items\":[{\"variant_id\":\"00000000-0000-0000-0000-000000000001\",\"quantity\":2,\"unit_price\":50.0}]}')",
       "Bash(mysql -u root -p12345678 inventory_sales_db -e \"SELECT variant_id FROM product_variant LIMIT 1;\")",
       "Bash(curl -s -X POST http://localhost:8000/api/outbound/manual -H 'Content-Type: application/json' -d '{\"customer_name\":\"Rahul Sharma\",\"items\":[{\"variant_id\":\"243\",\"quantity\":2,\"unit_price\":50.0}]}')",
-      "Bash(xargs ls)"
+      "Bash(xargs ls)",
+      "Bash(python -c ' *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

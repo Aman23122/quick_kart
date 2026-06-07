@@ -9,6 +9,7 @@ import InventoryGrid from '@/pages/InventoryGrid'
 import POMonitor from '@/pages/POMonitor'
 import AlertLog from '@/pages/AlertLog'
 import Settings from '@/pages/Settings'
+import ProductsPage from '@/pages/ProductsPage'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/inventory" element={<InventoryGrid />} />
         <Route path="/po" element={<POMonitor />} />
         <Route path="/alerts" element={<AlertLog />} />
+        <Route path="/products" element={<ProductsPage />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -119,7 +119,7 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
     proc = db.get(Procurement, procurement_id)
     if not proc:
         raise HTTPException(404, "Procurement not found")
-    if proc.status != "pending_approval":
+    if proc.status not in ("pending_approval", "rejected"):
         raise HTTPException(400, f"Cannot approve — current status is '{proc.status}'")
 
     items = (
