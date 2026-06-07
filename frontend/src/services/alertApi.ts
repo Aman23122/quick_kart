@@ -4,6 +4,8 @@ export interface AlertRow {
   alert_id: string
   variant_id: string
   variant_name: string
+  product_name: string
+  brand_name: string
   alert_type: string
   current_qty: number | null
   threshold_qty: number | null

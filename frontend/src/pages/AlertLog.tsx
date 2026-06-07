@@ -71,8 +71,17 @@ export default function AlertLog() {
     },
     {
       key: 'variant_name',
-      header: 'Variant',
-      render: (r) => <span className="font-medium text-slate-700">{String(r.variant_name)}</span>,
+      header: 'Product',
+      render: (r) => (
+        <div className="min-w-0">
+          <p className="font-medium text-slate-800 text-sm leading-tight">{String(r.product_name || r.variant_name)}</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {r.brand_name ? <span className="text-blue-500">{String(r.brand_name)}</span> : null}
+            {r.brand_name && r.variant_name ? ' · ' : ''}
+            {String(r.variant_name)}
+          </p>
+        </div>
+      ),
     },
     {
       key: 'message',

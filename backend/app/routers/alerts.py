@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.database import get_db
-from app.models import AlertLog, ProductVariant
+from app.models import AlertLog, ProductVariant, Product, Brand
 from app.utils.time_utils import format_ts, now
 
 router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
@@ -30,10 +30,14 @@ def list_alerts(
     result = []
     for a in rows:
         variant = db.get(ProductVariant, a.variant_id)
+        product = db.get(Product, variant.product_id) if variant else None
+        brand = db.get(Brand, product.brand_id) if product and product.brand_id else None
         result.append({
             "alert_id": a.alert_id,
             "variant_id": a.variant_id,
             "variant_name": variant.variant_name if variant else a.variant_id,
+            "product_name": product.product_name if product else "",
+            "brand_name": brand.name if brand else "",
             "alert_type": a.alert_type,
             "current_qty": a.current_qty,
             "threshold_qty": a.threshold_qty,
