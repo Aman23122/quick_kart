@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, X, Check, Package, ChevronDown } from 'lucide-react'
-import { getProducts, getBrands, createProduct, type CreateProductPayload } from '@/services/productApi'
+import { Plus, Search, X, Check, Package, ChevronDown, Pencil, Trash2 } from 'lucide-react'
+import { getProducts, getBrands, createProduct, updateProduct, deleteProduct, type CreateProductPayload, type ProductRow } from '@/services/productApi'
 import { cn } from '@/lib/utils'
 
 const inputCls =
@@ -131,6 +131,8 @@ export default function ProductsPage() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<CreateProductPayload>(EMPTY_FORM)
   const [saved, setSaved] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', search, brandFilter],
@@ -157,18 +159,70 @@ export default function ProductsPage() {
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: CreateProductPayload }) =>
+      updateProduct(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      setSaved(true)
+      setTimeout(() => {
+        setSaved(false)
+        setShowModal(false)
+        setForm(EMPTY_FORM)
+        setEditingId(null)
+      }, 1200)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      setDeleteConfirmId(null)
+    },
+  })
+
+  const openEdit = (p: ProductRow) => {
+    const v = p.variants[0]
+    setForm({
+      product_name: p.product_name,
+      brand_id: p.brand_id ?? '',
+      brand_name: '',
+      type: p.type ?? 'other',
+      description: p.description ?? '',
+      unit: v?.unit ?? 'G',
+      quantity: v?.quantity ?? 1,
+      base_price: v?.base_price ?? 0,
+      base_mrp: v?.base_mrp ?? 0,
+      buying_price: v?.buying_price ?? 0,
+      sell_before_days: v?.sell_before_days ?? 7,
+      temperature_required: v?.temperature_required ?? 4,
+      min_stock_level: v?.min_stock_level ?? 10,
+      max_stock_level: v?.max_stock_level ?? 500,
+      reorder_point: v?.reorder_point ?? 25,
+      reorder_qty: v?.reorder_qty ?? 100,
+    })
+    setEditingId(p.product_id)
+    setShowModal(true)
+  }
+
   const handleSubmit = () => {
     if (!form.product_name.trim()) return
     const isNewBrand = form.brand_id === '__new__'
     if (isNewBrand && !form.brand_name?.trim()) return
     if (!isNewBrand && !form.brand_id) return
-    createMutation.mutate({
+    const payload = {
       ...form,
       brand_id: !isNewBrand ? form.brand_id : undefined,
       brand_name: isNewBrand ? form.brand_name : undefined,
       description: form.description || undefined,
       base_mrp: form.base_mrp || form.base_price,
-    })
+    }
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, payload })
+    } else {
+      createMutation.mutate(payload)
+    }
   }
 
   const set = (key: keyof CreateProductPayload, value: string | number) =>
@@ -240,6 +294,7 @@ export default function ProductsPage() {
                 <th className="text-right px-5 py-3 font-semibold">Cost Price</th>
                 <th className="text-right px-5 py-3 font-semibold">Shelf Life</th>
                 <th className="text-right px-5 py-3 font-semibold">Min / Max</th>
+                <th className="px-5 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -265,10 +320,27 @@ export default function ProductsPage() {
                       {v?.sell_before_days != null ? `${v.sell_before_days}d` : '—'}
                     </td>
                     <td className="px-5 py-3 text-right text-slate-500">
-                      {(() => {
-                        const thresh = p.variants[0]
-                        return '—'
-                      })()}
+                      {v?.min_stock_level != null && v?.max_stock_level != null
+                        ? `${v.min_stock_level} / ${v.max_stock_level}`
+                        : '—'}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(p.product_id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -278,15 +350,52 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Add Product Modal */}
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (() => {
+        const target = products.find((p) => p.product_id === deleteConfirmId)
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Trash2 size={18} className="text-red-500" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-800">Delete product?</p>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    <span className="font-medium text-slate-700">{target?.product_name}</span> will be permanently removed.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => deleteMutation.mutate(deleteConfirmId)}
+                  disabled={deleteMutation.isPending}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors disabled:opacity-60"
+                >
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Add / Edit Product Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="font-semibold text-slate-800">Add New Product</h3>
+              <h3 className="font-semibold text-slate-800">{editingId ? 'Edit Product' : 'Add New Product'}</h3>
               <button
-                onClick={() => { setShowModal(false); setForm(EMPTY_FORM) }}
+                onClick={() => { setShowModal(false); setForm(EMPTY_FORM); setEditingId(null) }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
               >
                 <X size={16} />
@@ -414,20 +523,24 @@ export default function ProductsPage() {
             {/* Modal Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100">
               <button
-                onClick={() => { setShowModal(false); setForm(EMPTY_FORM) }}
+                onClick={() => { setShowModal(false); setForm(EMPTY_FORM); setEditingId(null) }}
                 className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={createMutation.isPending || saved}
+                disabled={createMutation.isPending || updateMutation.isPending || saved}
                 className={cn(
                   'flex items-center gap-2 px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-60',
                   saved ? 'bg-emerald-500' : 'bg-blue-600 hover:bg-blue-700'
                 )}
               >
-                {saved ? <><Check size={14} /> Saved!</> : createMutation.isPending ? 'Saving...' : 'Save Product'}
+                {saved
+                  ? <><Check size={14} /> Saved!</>
+                  : createMutation.isPending || updateMutation.isPending
+                  ? 'Saving...'
+                  : editingId ? 'Update Product' : 'Save Product'}
               </button>
             </div>
           </div>

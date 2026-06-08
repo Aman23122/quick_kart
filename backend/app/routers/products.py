@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, desc
 from pydantic import BaseModel
@@ -41,6 +41,28 @@ def list_products(
             ProductVariant.product_id == p.product_id,
             ProductVariant.is_deleted == False,
         ).all()
+        variant_rows = []
+        for v in variants:
+            thresh = db.query(AlertThreshold).filter(
+                AlertThreshold.variant_id == v.variant_id,
+                AlertThreshold.fulfillment_center_id == FC_ID,
+                AlertThreshold.is_active == True,
+            ).first()
+            variant_rows.append({
+                "variant_id": v.variant_id,
+                "variant_name": v.variant_name,
+                "unit": v.unit,
+                "quantity": float(v.quantity) if v.quantity else None,
+                "base_price": float(v.base_price) if v.base_price else None,
+                "base_mrp": float(v.base_mrp) if v.base_mrp else None,
+                "buying_price": float(v.buying_price) if v.buying_price else None,
+                "sell_before_days": v.sell_before_days,
+                "temperature_required": v.temperature_required,
+                "min_stock_level": thresh.min_stock_level if thresh else None,
+                "max_stock_level": thresh.max_stock_level if thresh else None,
+                "reorder_point": thresh.reorder_point if thresh else None,
+                "reorder_qty": thresh.reorder_qty if thresh else None,
+            })
         result.append({
             "product_id": p.product_id,
             "product_name": p.product_name,
@@ -49,20 +71,7 @@ def list_products(
             "type": p.type,
             "description": p.description,
             "variant_count": len(variants),
-            "variants": [
-                {
-                    "variant_id": v.variant_id,
-                    "variant_name": v.variant_name,
-                    "unit": v.unit,
-                    "quantity": float(v.quantity) if v.quantity else None,
-                    "base_price": float(v.base_price) if v.base_price else None,
-                    "base_mrp": float(v.base_mrp) if v.base_mrp else None,
-                    "buying_price": float(v.buying_price) if v.buying_price else None,
-                    "sell_before_days": v.sell_before_days,
-                    "temperature_required": v.temperature_required,
-                }
-                for v in variants
-            ],
+            "variants": variant_rows,
         })
     return {"total": len(result), "data": result}
 
@@ -155,6 +164,68 @@ def create_product(payload: CreateProductPayload, db: Session = Depends(get_db))
         "variant_id": variant.variant_id,
         "product_name": product.product_name,
     }
+
+
+@router.put("/{product_id}")
+def update_product(product_id: str, payload: CreateProductPayload, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.product_id == product_id, Product.is_deleted == False).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    brand_id = payload.brand_id
+    if not brand_id and payload.brand_name:
+        brand = db.query(Brand).filter(Brand.name.ilike(payload.brand_name.strip())).first()
+        if not brand:
+            brand = Brand(brand_id=new_id(), name=payload.brand_name.strip(), is_active=True)
+            db.add(brand)
+            db.flush()
+        brand_id = brand.brand_id
+
+    product.product_name = payload.product_name.strip()
+    product.brand_id = brand_id
+    product.type = payload.type
+    product.description = payload.description
+    product.updated_at = now()
+
+    variant = db.query(ProductVariant).filter(
+        ProductVariant.product_id == product_id,
+        ProductVariant.is_deleted == False,
+    ).first()
+    if variant:
+        variant.unit = payload.unit
+        variant.quantity = payload.quantity
+        variant.base_price = payload.base_price
+        variant.base_mrp = payload.base_mrp or payload.base_price
+        variant.buying_price = payload.buying_price
+        variant.sell_before_days = payload.sell_before_days
+        variant.temperature_required = payload.temperature_required
+
+        thresh = db.query(AlertThreshold).filter(
+            AlertThreshold.variant_id == variant.variant_id,
+            AlertThreshold.fulfillment_center_id == FC_ID,
+        ).first()
+        if thresh:
+            thresh.min_stock_level = payload.min_stock_level
+            thresh.max_stock_level = payload.max_stock_level
+            thresh.reorder_point = payload.reorder_point
+            thresh.reorder_qty = payload.reorder_qty
+            thresh.updated_at = now()
+
+    db.commit()
+    return {"product_id": product.product_id, "product_name": product.product_name}
+
+
+@router.delete("/{product_id}")
+def delete_product(product_id: str, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.product_id == product_id, Product.is_deleted == False).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    product.is_deleted = True
+    product.updated_at = now()
+    db.query(ProductVariant).filter(ProductVariant.product_id == product_id).update({"is_deleted": True})
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/variants/search")

@@ -6,10 +6,16 @@ export interface VariantOption {
   product_name: string
   brand_name: string
   unit: string | null
+  quantity?: number | null
   sell_before_days: number
   temperature_required: number
   buying_price: number | null
   base_price: number | null
+  base_mrp?: number | null
+  min_stock_level?: number | null
+  max_stock_level?: number | null
+  reorder_point?: number | null
+  reorder_qty?: number | null
 }
 
 export interface QuickAddPayload {
@@ -73,3 +79,9 @@ export const getProducts = (params?: { q?: string; brand_id?: string }) =>
 
 export const createProduct = (payload: CreateProductPayload) =>
   api.post<{ product_id: string; variant_id: string; product_name: string }>('/api/products', payload)
+
+export const updateProduct = (productId: string, payload: CreateProductPayload) =>
+  api.put<{ product_id: string; product_name: string }>(`/api/products/${productId}`, payload)
+
+export const deleteProduct = (productId: string) =>
+  api.delete(`/api/products/${productId}`)
