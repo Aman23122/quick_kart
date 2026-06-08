@@ -5,7 +5,6 @@ import {
   Trash2,
   Clock,
   TrendingDown,
-  TrendingUp,
   DollarSign,
   CheckCircle,
   XCircle,
@@ -309,7 +308,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-3 px-5 py-3 border-b border-orange-200 bg-orange-100/60">
               <ShoppingCart size={16} className="text-orange-600 flex-shrink-0" />
               <p className="text-sm font-semibold text-orange-800">
-                {salesAlertsData.data.length} product{salesAlertsData.data.length > 1 ? 's' : ''} approaching dispatch block — offer lagao, sell karo!
+                {salesAlertsData.data.length} product{salesAlertsData.data.length > 1 ? 's' : ''} approaching dispatch block — add an offer and move them fast!
               </p>
             </div>
             <div className="divide-y divide-orange-100">
