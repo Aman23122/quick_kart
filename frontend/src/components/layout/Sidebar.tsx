@@ -44,7 +44,7 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
         </div>
         {expanded && (
           <span className="font-bold text-white text-base tracking-tight whitespace-nowrap">
-            QuickKart
+            Quickart
           </span>
         )}
       </div>
