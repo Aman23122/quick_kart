@@ -22,7 +22,8 @@
       "Bash(curl -s -X POST http://localhost:8000/api/outbound/manual -H 'Content-Type: application/json' -d '{\"customer_name\":\"Rahul Sharma\",\"items\":[{\"variant_id\":\"243\",\"quantity\":2,\"unit_price\":50.0}]}')",
       "Bash(xargs ls)",
       "Bash(python -c ' *)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(python seed/seed_config.py)"
     ]
   }
 }
