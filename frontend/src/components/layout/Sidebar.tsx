@@ -2,20 +2,26 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   PackageCheck,
+  PackagePlus,
   PackageOpen,
+  ShoppingCart,
   Warehouse,
   ClipboardList,
   Bell,
   Settings,
   Zap,
+  Box,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/stock-entry', label: 'Stock Entry', icon: PackagePlus },
   { to: '/inbound', label: 'Inbound', icon: PackageCheck },
+  { to: '/sales-order', label: 'Sales Order', icon: ShoppingCart },
   { to: '/outbound', label: 'Outbound', icon: PackageOpen },
   { to: '/inventory', label: 'Inventory', icon: Warehouse },
+  { to: '/products', label: 'Products', icon: Box },
   { to: '/po', label: 'PO Monitor', icon: ClipboardList },
   { to: '/alerts', label: 'Alert Log', icon: Bell },
   { to: '/settings', label: 'Settings', icon: Settings },
@@ -38,7 +44,7 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
         </div>
         {expanded && (
           <span className="font-bold text-white text-base tracking-tight whitespace-nowrap">
-            QuickKart
+            Quickart
           </span>
         )}
       </div>

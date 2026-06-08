@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings2, AlertTriangle, Calendar, Layers, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { Settings2, AlertTriangle, Calendar, Layers, ChevronDown, ChevronUp, Trash2, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { daysLabel } from '@/lib/utils'
 import { deleteBatch } from '@/services/inventoryApi'
@@ -13,6 +13,8 @@ export interface BatchDetail {
   expiry_date: string | null
   days_until_expiry: number | null
   created_at: string
+  dispatch_cutoff: string | null
+  dispatch_cutoff_expired: boolean
 }
 
 export interface InventoryItem {
@@ -55,7 +57,7 @@ const statusQtyColor: Record<string, string> = {
   red: 'text-rose-600',
 }
 
-const expiryColor = (days: number | null): string => {
+export const expiryColor = (days: number | null): string => {
   if (days === null) return 'text-slate-400'
   if (days < 0) return 'text-rose-600 font-semibold'
   if (days <= 1) return 'text-rose-500 font-semibold'
@@ -87,6 +89,7 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
     mutationFn: (inventoryId: string) => deleteBatch(inventoryId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inventory-grid'] }),
   })
+
 
   return (
     <div
@@ -197,7 +200,7 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
             </thead>
             <tbody className="divide-y divide-slate-50">
               {item.batches.map((batch, idx) => {
-                const isDeletable = batch.qty === 0 || (batch.days_until_expiry !== null && batch.days_until_expiry < 0)
+                const isDeletable = batch.qty === 0 || (batch.days_until_expiry !== null && batch.days_until_expiry < 0) || batch.dispatch_cutoff_expired
                 const isDeleting = deletingId === batch.inventory_id
                 return (
                   <tr
@@ -210,11 +213,29 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
                   >
                     {/* Batch no or fallback */}
                     <td className="py-1.5 px-2">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={cn('w-2 h-2 rounded-full flex-shrink-0', batchRowDot(batch.days_until_expiry))} />
                         <span className="font-medium text-slate-700">
                           {batch.batch_no ?? `Batch ${idx + 1}`}
                         </span>
+                        {batch.dispatch_cutoff && (
+                          batch.dispatch_cutoff_expired ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-rose-100 text-rose-600">
+                              <Clock size={9} /> Dispatch Blocked
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-50 text-amber-600">
+                              <Clock size={9} /> {(() => {
+                                const cutoffDate = new Date(batch.dispatch_cutoff)
+                                const isToday = cutoffDate.toDateString() === new Date().toDateString()
+                                const timeStr = cutoffDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                                if (isToday) return `by ${timeStr}`
+                                const dateStr = cutoffDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                                return `by ${dateStr}, ${timeStr}`
+                              })()}
+                            </span>
+                          )
+                        )}
                       </div>
                     </td>
                     {/* Qty */}
@@ -235,7 +256,7 @@ export default function InventoryCard({ item, onEditThreshold }: InventoryCardPr
                         <button
                           onClick={() => removeBatch(batch.inventory_id)}
                           disabled={isDeleting}
-                          title={batch.qty === 0 ? 'Delete empty batch' : 'Delete expired batch'}
+                          title={batch.qty === 0 ? 'Delete empty batch' : batch.dispatch_cutoff_expired ? 'Delete dispatch-blocked batch' : 'Delete expired batch'}
                           className="p-1 rounded text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors disabled:cursor-not-allowed"
                         >
                           <Trash2 size={13} />

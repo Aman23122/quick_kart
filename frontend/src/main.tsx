@@ -5,6 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App'
 
+// Prevent mouse-wheel / trackpad scroll from changing number input values
+document.addEventListener('wheel', () => {
+  if (document.activeElement instanceof HTMLInputElement && document.activeElement.type === 'number') {
+    document.activeElement.blur()
+  }
+}, { passive: true })
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

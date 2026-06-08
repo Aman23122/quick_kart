@@ -1,10 +1,11 @@
 import { Clock, Calendar } from 'lucide-react'
 import { formatTs } from '@/lib/utils'
-import CountdownTimer from './CountdownTimer'
 
 interface Job {
   job_id: string
   next_run: string
+  label: string
+  vendor_name: string
 }
 
 interface SchedulerLogProps {
@@ -31,18 +32,21 @@ export default function SchedulerLog({ jobs }: SchedulerLogProps) {
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-slate-50 border-b border-slate-100">
-            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Job ID</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Next Run</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Countdown</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Schedule</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Next Fire</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
           {jobs.map((job) => (
             <tr key={job.job_id} className="hover:bg-slate-50/60 transition-colors">
-              <td className="px-5 py-3 font-mono text-xs text-slate-600">{job.job_id}</td>
-              <td className="px-5 py-3 text-slate-600">{formatTs(job.next_run)}</td>
               <td className="px-5 py-3">
-                <CountdownTimer targetTime={job.next_run} />
+                <p className="text-sm font-medium text-slate-700">{job.label}</p>
+                {job.vendor_name && (
+                  <p className="text-xs text-slate-400 mt-0.5">{job.vendor_name}</p>
+                )}
+              </td>
+              <td className="px-5 py-3 text-sm text-slate-600">
+                {job.next_run ? formatTs(job.next_run) : <span className="text-slate-400">—</span>}
               </td>
             </tr>
           ))}

@@ -9,6 +9,7 @@ import {
   Edit2,
   X,
   Settings as SettingsIcon,
+  Bell,
 } from 'lucide-react'
 import { getConfig, updateConfig, type ConfigRow } from '@/services/configApi'
 import { cn } from '@/lib/utils'
@@ -33,10 +34,17 @@ const CONFIG_GROUPS: {
     color: 'text-blue-600 bg-blue-50',
   },
   {
-    title: 'Shelf-Life Dispatch Rules',
-    description: 'Maximum hours/days before dispatch is blocked',
+    title: 'Dispatch Windows — Per Product',
+    description: 'Minutes after inbound approval within which each product type can be dispatched. First matching rule wins; generic dairy is the fallback.',
     icon: Clock,
-    keys: ['milk_max_hours', 'paneer_curd_bread_batter_max_days', 'butter_max_days'],
+    keys: [
+      'dispatch_window_milk_min',
+      'dispatch_window_paneer_curd_min',
+      'dispatch_window_bread_batter_min',
+      'dispatch_window_butter_min',
+      'dispatch_window_meat_min',
+      'dairy_dispatch_window_minutes',
+    ],
     color: 'text-amber-600 bg-amber-50',
   },
   {
@@ -45,6 +53,20 @@ const CONFIG_GROUPS: {
     icon: TrendingDown,
     keys: ['fruits_veg_wastage_alert_days', 'low_stock_pct_threshold'],
     color: 'text-rose-600 bg-rose-50',
+  },
+  {
+    title: 'Sales Alert Timing — Before Dispatch Block',
+    description: 'Minutes before dispatch block to alert sales team to run offers and clear stock',
+    icon: Bell,
+    keys: [
+      'pre_dispatch_alert_milk_min',
+      'pre_dispatch_alert_paneer_min',
+      'pre_dispatch_alert_bread_min',
+      'pre_dispatch_alert_butter_min',
+      'pre_dispatch_alert_meat_min',
+      'pre_dispatch_alert_default_min',
+    ],
+    color: 'text-orange-600 bg-orange-50',
   },
 ]
 
@@ -156,8 +178,11 @@ export default function Settings() {
   const saveMutation = useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>
       updateConfig(key, value),
-    onSuccess: () => {
+    onSuccess: (_, { key }) => {
       queryClient.invalidateQueries({ queryKey: ['config'] })
+      if (key.startsWith('po_')) {
+        queryClient.invalidateQueries({ queryKey: ['po-schedule'] })
+      }
       setSavingKey(null)
     },
     onError: () => {

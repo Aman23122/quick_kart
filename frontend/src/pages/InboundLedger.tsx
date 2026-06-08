@@ -1,22 +1,24 @@
-import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { CheckCircle, XCircle, FileDown } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
+import { CheckCircle, XCircle, Clock, Thermometer, ShieldAlert, Timer, ShieldCheck } from 'lucide-react'
 import {
-  uploadInboundCSV,
   getInboundLedger,
+  getPendingApprovals,
+  approveInbound,
+  rejectInbound,
   type InboundRow,
-  type UploadResult,
+  type PendingItem,
 } from '@/services/inboundApi'
-import CSVUploader from '@/components/shared/CSVUploader'
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable'
 import StatusBadge from '@/components/shared/StatusBadge'
 import ExportButton from '@/components/shared/ExportButton'
 
 const PAGE_SIZE = 20
 
-const columns: ColumnDef<InboundRow>[] = [
+const ledgerColumns: ColumnDef<InboundRow>[] = [
   { key: 'po_number', header: 'PO #' },
-  { key: 'vendor', header: 'Vendor' },
+  { key: 'vendor_name', header: 'Vendor' },
   { key: 'variant_name', header: 'Variant' },
   {
     key: 'ordered_qty',
@@ -29,36 +31,250 @@ const columns: ColumnDef<InboundRow>[] = [
     render: (r) => String(r.received_qty ?? '—'),
   },
   {
-    key: 'temperature_c',
+    key: 'temperature_measured',
     header: 'Temp (°C)',
-    render: (r) => (r.temperature_c !== null && r.temperature_c !== undefined ? `${r.temperature_c}°` : '—'),
+    render: (r) =>
+      r.temperature_measured !== null && r.temperature_measured !== undefined
+        ? `${r.temperature_measured}°`
+        : '—',
   },
-  { key: 'batch_code', header: 'Batch' },
+  { key: 'batch_no', header: 'Batch' },
   {
     key: 'sell_before_date',
     header: 'Sell Before',
     render: (r) => String(r.sell_before_date ?? '—'),
   },
   {
+    key: 'on_time',
+    header: 'On Time?',
+    render: (r) => {
+      if (r.on_time === null || r.on_time === undefined) {
+        return <span className="text-slate-300 text-xs">—</span>
+      }
+      const diff = r.on_time_diff_minutes as number | null | undefined
+      const diffLabel = (() => {
+        if (diff == null) return null
+        const abs = Math.abs(diff)
+        if (abs < 60) return `${abs}m`
+        if (abs < 1440) {
+          const h = Math.floor(abs / 60)
+          const m = abs % 60
+          return m > 0 ? `${h}h ${m}m` : `${h}h`
+        }
+        const d = Math.floor(abs / 1440)
+        const h = Math.floor((abs % 1440) / 60)
+        return h > 0 ? `${d}d ${h}h` : `${d}d`
+      })()
+      return r.on_time ? (
+        <div className="flex flex-col gap-0.5">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 w-fit">
+            <Timer size={11} /> On Time
+          </span>
+          {diffLabel && <span className="text-xs text-emerald-600 pl-1">{diffLabel} early</span>}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-0.5">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 w-fit">
+            <Timer size={11} /> Late
+          </span>
+          {diffLabel && <span className="text-xs text-rose-600 pl-1">{diffLabel}</span>}
+        </div>
+      )
+    },
+  },
+  {
     key: 'status',
     header: 'Status',
-    render: (r) => r.status ? <StatusBadge status={String(r.status)} /> : <span className="text-slate-400">—</span>,
+    render: (r) =>
+      r.status ? (
+        <StatusBadge status={String(r.status)} />
+      ) : (
+        <span className="text-slate-400">—</span>
+      ),
   },
   {
     key: 'created_at',
     header: 'Timestamp',
-    render: (r) => <span className="text-xs text-slate-500">{String(r.created_at ?? '—')}</span>,
+    render: (r) => (
+      <span className="text-xs text-slate-500">{String(r.created_at ?? '—')}</span>
+    ),
   },
 ]
 
+function PendingApprovalPanel({ highlightPO }: { highlightPO?: string }) {
+  const queryClient = useQueryClient()
+  const highlightRef = useRef<HTMLTableRowElement>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['pending-approvals'],
+    queryFn: () => getPendingApprovals().then((r) => r.data),
+    refetchInterval: 15000,
+  })
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => approveInbound(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['inbound-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory-grid'] })
+    },
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: string) => rejectInbound(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['inbound-ledger'] })
+    },
+  })
+
+  const items: PendingItem[] = data?.data ?? []
+  const total = data?.total ?? 0
+
+  // Scroll to first highlighted row once data loads
+  useEffect(() => {
+    if (highlightPO && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlightPO, items.length])
+
+  if (!isLoading && total === 0) return null
+
+  return (
+    <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-6 py-4 bg-amber-50 border-b border-amber-200">
+        <Clock size={18} className="text-amber-600" />
+        <h2 className="font-semibold text-amber-800">Pending Approvals</h2>
+        {total > 0 && (
+          <span className="ml-1 px-2 py-0.5 text-xs font-bold rounded-full bg-amber-500 text-white">
+            {total}
+          </span>
+        )}
+        <p className="ml-auto text-xs text-amber-700">
+          Review each shipment before it enters inventory
+        </p>
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <div className="p-6 text-sm text-slate-400">Loading pending approvals…</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 uppercase tracking-wide">
+                <th className="px-4 py-3 text-left">PO #</th>
+                <th className="px-4 py-3 text-left">Product / Variant</th>
+                <th className="px-4 py-3 text-left">Vendor</th>
+                <th className="px-4 py-3 text-right">Ordered</th>
+                <th className="px-4 py-3 text-right">Received</th>
+                <th className="px-4 py-3 text-center">Temp (°C)</th>
+                <th className="px-4 py-3 text-left">Batch</th>
+                <th className="px-4 py-3 text-left">Expiry</th>
+                <th className="px-4 py-3 text-left">Sell Before</th>
+                <th className="px-4 py-3 text-right">Total Cost</th>
+                <th className="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {items.map((item, idx) => {
+                const isBusy =
+                  approveMutation.isPending || rejectMutation.isPending
+                const isHighlighted = !!highlightPO && item.po_number === highlightPO
+                const isFirstHighlighted = isHighlighted && items.findIndex(i => i.po_number === highlightPO) === idx
+                return (
+                  <tr
+                    key={item.procurement_item_id}
+                    ref={isFirstHighlighted ? highlightRef : undefined}
+                    className={`transition-colors ${isHighlighted ? 'bg-amber-50 ring-1 ring-inset ring-amber-300' : 'hover:bg-slate-50/60'}`}
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                      {item.po_number}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-800">{item.product_name}</div>
+                      <div className="text-xs text-slate-400">{item.variant_name}</div>
+                      {item.brand_name && (
+                        <div className="text-xs text-slate-400">{item.brand_name}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{item.vendor_name}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{item.ordered_qty}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{item.received_qty}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                          item.temp_ok
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-rose-50 text-rose-700'
+                        }`}
+                      >
+                        {item.temp_ok ? (
+                          <Thermometer size={12} />
+                        ) : (
+                          <ShieldAlert size={12} />
+                        )}
+                        {item.temperature_measured}°
+                        {!item.temp_ok && (
+                          <span className="text-rose-500 font-normal">
+                            &nbsp;(max {item.temp_threshold}°)
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                      {item.batch_no ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-600">
+                      {item.expiry_date ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-600">{item.sell_before_date}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      ₹{item.total_cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          disabled={isBusy}
+                          onClick={() => approveMutation.mutate(item.procurement_id)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+                        >
+                          <CheckCircle size={13} />
+                          Approve
+                        </button>
+                        <button
+                          disabled={isBusy}
+                          onClick={() => rejectMutation.mutate(item.procurement_id)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-50 transition-colors"
+                        >
+                          <XCircle size={13} />
+                          Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function InboundLedger() {
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
+  const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
+  const highlightPO = searchParams.get('po') ?? undefined
+
   const [page, setPage] = useState(1)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [status, setStatus] = useState('')
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['inbound-ledger', page, dateFrom, dateTo, status],
     queryFn: () =>
       getInboundLedger({
@@ -70,77 +286,43 @@ export default function InboundLedger() {
       }).then((r) => r.data),
   })
 
-  const uploadMutation = useMutation({
-    mutationFn: uploadInboundCSV,
-    onSuccess: (result) => {
-      setUploadResult(result)
-      refetch()
+  const forceApproveMutation = useMutation({
+    mutationFn: (procurementId: string) => approveInbound(procurementId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inbound-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory-grid'] })
     },
   })
 
-  const handleUpload = (file: File) => {
-    uploadMutation.mutate(file)
-  }
+  const ledgerColumnsWithActions: ColumnDef<InboundRow>[] = [
+    ...ledgerColumns,
+    {
+      key: 'actions',
+      header: '',
+      render: (r) => {
+        if (r.status !== 'rejected') return null
+        return (
+          <button
+            disabled={forceApproveMutation.isPending}
+            onClick={() => r.procurement_id && forceApproveMutation.mutate(r.procurement_id)}
+            title="Force approve — bypass QC and add to inventory"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            <ShieldCheck size={12} />
+            Force Approve
+          </button>
+        )
+      },
+    },
+  ]
 
   return (
     <div className="space-y-6">
-      {/* Upload section */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="font-semibold text-slate-800">Upload Inbound CSV</h2>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Upload a CSV file to record inbound stock entries.
-            </p>
-          </div>
-          <a
-            href="/sample_csvs/inbound_sample.csv"
-            download
-            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
-          >
-            <FileDown size={15} />
-            Download Sample
-          </a>
-        </div>
-
-        <CSVUploader
-          onUpload={handleUpload}
-          loading={uploadMutation.isPending}
-          label="Drop inbound CSV here or click to browse"
-        />
-
-        {/* Upload result */}
-        {uploadResult && (
-          <div className="flex flex-wrap gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
-            <div className="flex items-center gap-2">
-              <CheckCircle size={16} className="text-emerald-500" />
-              <span className="text-sm font-medium text-slate-700">
-                Accepted: <span className="text-emerald-600 font-bold">{uploadResult.accepted}</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <XCircle size={16} className="text-rose-500" />
-              <span className="text-sm font-medium text-slate-700">
-                Rejected: <span className="text-rose-600 font-bold">{uploadResult.rejected}</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-500">
-                Total: <span className="font-medium text-slate-700">{uploadResult.total}</span>
-              </span>
-            </div>
-            {uploadMutation.isError && (
-              <p className="w-full text-sm text-rose-600">
-                Upload failed. Please check the file format.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Pending approvals — hidden when empty */}
+      <PendingApprovalPanel highlightPO={highlightPO} />
 
       {/* Ledger */}
       <div className="space-y-4">
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <label className="text-xs text-slate-500 font-medium">From</label>
@@ -166,7 +348,8 @@ export default function InboundLedger() {
             className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white"
           >
             <option value="">All Status</option>
-            <option value="accepted">Accepted</option>
+            <option value="pending_approval">Pending Approval</option>
+            <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
           <div className="ml-auto">
@@ -178,14 +361,14 @@ export default function InboundLedger() {
         </div>
 
         <DataTable
-          columns={columns}
+          columns={ledgerColumnsWithActions}
           data={(data?.data as InboundRow[]) ?? []}
           loading={isLoading}
           totalCount={data?.total ?? 0}
           page={page}
           onPageChange={setPage}
           pageSize={PAGE_SIZE}
-          emptyMessage="No inbound records found. Upload a CSV to get started."
+          emptyMessage="No inbound records yet."
         />
       </div>
     </div>

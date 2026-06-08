@@ -1,19 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, XCircle, ShieldCheck } from 'lucide-react'
 import { listAlerts, resolveAlert, type AlertRow } from '@/services/alertApi'
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable'
 import StatusBadge from '@/components/shared/StatusBadge'
 import ExportButton from '@/components/shared/ExportButton'
+import { useNotificationStore } from '@/store/useNotificationStore'
 
 const PAGE_SIZE = 20
 
 const ALERT_TYPES = [
   { value: '', label: 'All Types' },
+  { value: 'approaching_dispatch_cutoff', label: 'Sales Alert' },
   { value: 'low_stock', label: 'Low Stock' },
   { value: 'wastage_risk', label: 'Wastage Risk' },
   { value: 'temp_rejection', label: 'Temp Rejection' },
   { value: 'dispatch_blocked', label: 'Dispatch Blocked' },
+  { value: 'stock_shortage', label: 'Stock Shortage' },
 ]
 
 export default function AlertLog() {
@@ -22,6 +25,8 @@ export default function AlertLog() {
   const [alertType, setAlertType] = useState('')
   const [showResolved, setShowResolved] = useState(false)
   const [resolvingId, setResolvingId] = useState<string | null>(null)
+
+  const notifications = useNotificationStore((s) => s.notifications)
 
   const { data, isLoading } = useQuery({
     queryKey: ['alerts', page, alertType, showResolved],
@@ -33,6 +38,15 @@ export default function AlertLog() {
         limit: PAGE_SIZE,
       }).then((r) => r.data),
   })
+
+  useEffect(() => {
+    const relevant = notifications.some(
+      (n) => !n.read && (n.type === 'low_stock' || n.type === 'stock_restocked' || n.type === 'approaching_dispatch_cutoff')
+    )
+    if (relevant) {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] })
+    }
+  }, [notifications, queryClient])
 
   const resolveMutation = useMutation({
     mutationFn: (alertId: string) => resolveAlert(alertId),
@@ -58,8 +72,17 @@ export default function AlertLog() {
     },
     {
       key: 'variant_name',
-      header: 'Variant',
-      render: (r) => <span className="font-medium text-slate-700">{String(r.variant_name)}</span>,
+      header: 'Product',
+      render: (r) => (
+        <div className="min-w-0">
+          <p className="font-medium text-slate-800 text-sm leading-tight">{String(r.product_name || r.variant_name)}</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {r.brand_name ? <span className="text-blue-500">{String(r.brand_name)}</span> : null}
+            {r.brand_name && r.variant_name ? ' · ' : ''}
+            {String(r.variant_name)}
+          </p>
+        </div>
+      ),
     },
     {
       key: 'message',

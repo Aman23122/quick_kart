@@ -36,4 +36,9 @@ def update_config(config_key: str, payload: ConfigUpdate, db: Session = Depends(
         raise HTTPException(404, f"Config key '{config_key}' not found")
     row.config_value = payload.config_value
     db.commit()
+
+    if config_key.startswith("po_"):
+        from app.services.po_scheduler import setup_jobs
+        setup_jobs()
+
     return {"status": "updated", "config_key": config_key, "config_value": payload.config_value}

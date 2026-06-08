@@ -58,7 +58,7 @@ def check_and_alert(db: Session, variant_id: str) -> bool:
     if current_qty > effective_min:
         return False
 
-    # Avoid duplicate unresolved alerts
+    # Avoid duplicate unresolved alerts — refresh existing instead of skipping
     existing = (
         db.query(AlertLog)
         .filter(
@@ -69,6 +69,15 @@ def check_and_alert(db: Session, variant_id: str) -> bool:
         .first()
     )
     if existing:
+        existing.current_qty = current_qty
+        existing.threshold_qty = effective_min
+        existing.created_at = now()
+        existing.message = (
+            f"Low stock: current qty {current_qty} has breached minimum level {effective_min}. "
+            f"Reorder qty suggested: {threshold.reorder_qty or 'N/A'}. "
+            f"[Simulated email dispatched to procurement team]"
+        )
+        db.commit()
         return False
 
     db.add(AlertLog(
@@ -94,6 +103,59 @@ def check_and_alert(db: Session, variant_id: str) -> bool:
     notification_service.push(
         message=f"Low stock alert triggered for variant {variant_id}. Email simulated to procurement.",
         ntype="low_stock",
+        variant_id=variant_id,
+    )
+
+    return True
+
+
+def auto_resolve_if_restocked(db: Session, variant_id: str) -> bool:
+    """Auto-resolve open low_stock alert if stock is back above threshold."""
+    fc_id = settings.FULFILLMENT_CENTER_ID
+    current_qty = get_current_qty(db, variant_id, fc_id)
+
+    threshold = (
+        db.query(AlertThreshold)
+        .filter(
+            AlertThreshold.variant_id == variant_id,
+            AlertThreshold.fulfillment_center_id == fc_id,
+            AlertThreshold.is_active == True,
+        )
+        .first()
+    )
+    if not threshold:
+        return False
+
+    min_level = threshold.min_stock_level
+    max_level = threshold.max_stock_level or 0
+    pct_threshold = int(_get_cfg(db, "low_stock_pct_threshold", "20"))
+    pct_min = int(max_level * pct_threshold / 100) if max_level else min_level
+    effective_min = max(min_level, pct_min)
+
+    if current_qty <= effective_min:
+        return False
+
+    existing = (
+        db.query(AlertLog)
+        .filter(
+            AlertLog.variant_id == variant_id,
+            AlertLog.alert_type == "low_stock",
+            AlertLog.is_resolved == False,
+        )
+        .first()
+    )
+    if not existing:
+        return False
+
+    existing.is_resolved = True
+    existing.resolved_at = now()
+    existing.resolved_by = "system"
+    db.commit()
+
+    from app.services import notification_service
+    notification_service.push(
+        message=f"Stock restocked for variant {variant_id}. Low stock alert auto-resolved.",
+        ntype="stock_restocked",
         variant_id=variant_id,
     )
 

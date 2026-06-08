@@ -14,7 +14,7 @@ export default function AppShell({ children }: AppShellProps) {
 
   useEffect(() => {
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 60_000)
+    const interval = setInterval(fetchNotifications, 4_000)
     return () => clearInterval(interval)
   }, [fetchNotifications])
 
