@@ -11,6 +11,7 @@ const PAGE_SIZE = 20
 
 const ALERT_TYPES = [
   { value: '', label: 'All Types' },
+  { value: 'approaching_dispatch_cutoff', label: 'Sales Alert' },
   { value: 'low_stock', label: 'Low Stock' },
   { value: 'wastage_risk', label: 'Wastage Risk' },
   { value: 'temp_rejection', label: 'Temp Rejection' },
@@ -40,7 +41,7 @@ export default function AlertLog() {
 
   useEffect(() => {
     const relevant = notifications.some(
-      (n) => !n.read && (n.type === 'low_stock' || n.type === 'stock_restocked')
+      (n) => !n.read && (n.type === 'low_stock' || n.type === 'stock_restocked' || n.type === 'approaching_dispatch_cutoff')
     )
     if (relevant) {
       queryClient.invalidateQueries({ queryKey: ['alerts'] })

@@ -9,6 +9,7 @@ import {
   Edit2,
   X,
   Settings as SettingsIcon,
+  Bell,
 } from 'lucide-react'
 import { getConfig, updateConfig, type ConfigRow } from '@/services/configApi'
 import { cn } from '@/lib/utils'
@@ -52,6 +53,20 @@ const CONFIG_GROUPS: {
     icon: TrendingDown,
     keys: ['fruits_veg_wastage_alert_days', 'low_stock_pct_threshold'],
     color: 'text-rose-600 bg-rose-50',
+  },
+  {
+    title: 'Sales Alert Timing — Before Dispatch Block',
+    description: 'Minutes before dispatch block to alert sales team to run offers and clear stock',
+    icon: Bell,
+    keys: [
+      'pre_dispatch_alert_milk_min',
+      'pre_dispatch_alert_paneer_min',
+      'pre_dispatch_alert_bread_min',
+      'pre_dispatch_alert_butter_min',
+      'pre_dispatch_alert_meat_min',
+      'pre_dispatch_alert_default_min',
+    ],
+    color: 'text-orange-600 bg-orange-50',
   },
 ]
 

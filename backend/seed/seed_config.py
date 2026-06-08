@@ -24,6 +24,12 @@ CONFIG_DEFAULTS = [
     ("low_stock_pct_threshold", "20", "% of max_stock_level that triggers low-stock alert"),
     ("po_dairy_evening_grace_time", "18:20", "Dairy Evening: time scheduler triggers draft PO creation (HH:MM, Asia/Kolkata)"),
     ("po_meat_morning_grace_time",  "11:50", "Meat Morning: time scheduler triggers draft PO creation (HH:MM, Asia/Kolkata)"),
+    ("pre_dispatch_alert_milk_min",         "60",  "Milk: alert sales team X minutes before dispatch block (60 = 1h before)"),
+    ("pre_dispatch_alert_paneer_min",        "60",  "Paneer / Curd / Yoghurt: alert sales team X minutes before dispatch block"),
+    ("pre_dispatch_alert_bread_min",         "45",  "Bread / Batter: alert sales team X minutes before dispatch block"),
+    ("pre_dispatch_alert_butter_min",        "60",  "Butter: alert sales team X minutes before dispatch block"),
+    ("pre_dispatch_alert_meat_min",          "60",  "Meat / Poultry / Fish: alert sales team X minutes before dispatch block"),
+    ("pre_dispatch_alert_default_min",       "60",  "Default: alert sales team X minutes before dispatch block (fallback for all other products)"),
 ]
 
 FC_ROW = {

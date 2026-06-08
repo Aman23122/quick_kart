@@ -175,10 +175,12 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
         .all()
     )
 
+    to_schedule = []
     for item in items:
+        inv_id = new_id()
         cutoff = _build_dispatch_cutoff(db, item.variant_id)
         db.add(Inventory(
-            inventory_id=new_id(),
+            inventory_id=inv_id,
             variant_id=item.variant_id,
             fulfillment_center_id=FC_ID,
             qty=item.received_qty,
@@ -190,11 +192,17 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
             created_at=now(),
             updated_at=now(),
         ))
+        if cutoff:
+            to_schedule.append((inv_id, item.variant_id, cutoff))
 
     proc.status = "approved"
     proc.actual_received_date = now().date()
     proc.updated_at = now()
     db.commit()
+
+    from app.services.shelf_life_checker import schedule_pre_dispatch_alert
+    for inv_id, variant_id, cutoff in to_schedule:
+        schedule_pre_dispatch_alert(db, inv_id, variant_id, cutoff)
 
     # Run stock monitor for all approved variants
     for item in items:

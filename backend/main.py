@@ -46,7 +46,8 @@ async def lifespan(app: FastAPI):
     setup_jobs()
 
     # Check dispatch cutoff expiry every 15 minutes
-    from app.services.shelf_life_checker import check_dispatch_cutoff_alerts
+    from app.services.shelf_life_checker import check_dispatch_cutoff_alerts, schedule_pre_dispatch_alert
+    from app.models.inventory import Inventory as InventoryModel
     from app.database import SessionLocal
     from apscheduler.triggers.interval import IntervalTrigger
 
@@ -63,6 +64,29 @@ async def lifespan(app: FastAPI):
         id="dispatch_cutoff_check",
         replace_existing=True,
     )
+
+    # On startup: re-schedule pre-dispatch alerts for any existing batches
+    # (covers server restarts — DateTrigger jobs don't survive restarts)
+    def _reschedule_existing_batches():
+        from datetime import datetime as _dt
+        db = SessionLocal()
+        try:
+            batches = (
+                db.query(InventoryModel)
+                .filter(
+                    InventoryModel.dispatch_cutoff.isnot(None),
+                    InventoryModel.dispatch_cutoff > _dt.now(),
+                    InventoryModel.qty > 0,
+                )
+                .all()
+            )
+            for batch in batches:
+                schedule_pre_dispatch_alert(db, batch.inventory_id, batch.variant_id, batch.dispatch_cutoff)
+            print(f"[Scheduler] Rescheduled pre-dispatch alerts for {len(batches)} batch(es).")
+        finally:
+            db.close()
+
+    _reschedule_existing_batches()
 
     scheduler.start()
     print(f"[Scheduler] Started with {len(scheduler.get_jobs())} jobs.")

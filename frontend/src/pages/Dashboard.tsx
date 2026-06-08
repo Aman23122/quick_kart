@@ -13,6 +13,7 @@ import {
   Download,
   ArrowDownToLine,
   ArrowUpFromLine,
+  ShoppingCart,
 } from 'lucide-react'
 import api from '@/lib/axios'
 import { listAlerts } from '@/services/alertApi'
@@ -175,6 +176,12 @@ export default function Dashboard() {
     queryFn: () => listAlerts({ is_resolved: false, limit: 5 }).then((r) => r.data),
   })
 
+  const { data: salesAlertsData } = useQuery({
+    queryKey: ['sales-alerts'],
+    queryFn: () => listAlerts({ alert_type: 'approaching_dispatch_cutoff', is_resolved: false, limit: 10 }).then((r) => r.data),
+    refetchInterval: 60_000,
+  })
+
   const { data: inboundDetail } = useQuery({
     queryKey: ['dashboard-today-inbound'],
     queryFn: () => api.get<{ total_value: number; data: InboundDetailRow[] }>('/api/dashboard/today-inbound').then((r) => r.data),
@@ -291,6 +298,43 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Sales Action Required */}
+      {salesAlertsData?.data && salesAlertsData.data.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
+            Sales Action Required
+          </h2>
+          <div className="bg-orange-50 border border-orange-200 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-3 border-b border-orange-200 bg-orange-100/60">
+              <ShoppingCart size={16} className="text-orange-600 flex-shrink-0" />
+              <p className="text-sm font-semibold text-orange-800">
+                {salesAlertsData.data.length} product{salesAlertsData.data.length > 1 ? 's' : ''} approaching dispatch block — offer lagao, sell karo!
+              </p>
+            </div>
+            <div className="divide-y divide-orange-100">
+              {salesAlertsData.data.map((alert) => (
+                <div key={alert.alert_id} className="flex items-start gap-4 px-5 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 leading-tight">
+                      {String(alert.product_name || alert.variant_name)}
+                      {alert.brand_name ? (
+                        <span className="ml-1.5 text-xs font-normal text-blue-500">{String(alert.brand_name)}</span>
+                      ) : null}
+                    </p>
+                    <p className="text-xs text-orange-700 mt-0.5 leading-snug">{alert.message}</p>
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    <span className="text-xs font-semibold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full border border-orange-200">
+                      {alert.current_qty} units
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Recent Alerts */}
       <div>
