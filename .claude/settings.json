@@ -23,7 +23,8 @@
       "Bash(xargs ls)",
       "Bash(python -c ' *)",
       "Bash(python3 -c ' *)",
-      "Bash(python seed/seed_config.py)"
+      "Bash(python seed/seed_config.py)",
+      "Bash(MYSQL_PWD=12345678 mysql -uroot inventory_sales_db)"
     ]
   }
 }

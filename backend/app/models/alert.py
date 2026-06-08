@@ -29,6 +29,7 @@ class AlertLog(Base):
     alert_type = Column(String(50), nullable=False)
     current_qty = Column(Integer, nullable=True)
     threshold_qty = Column(Integer, nullable=True)
+    batch_no = Column(String(100), nullable=True)
     message = Column(Text, nullable=True)
     is_resolved = Column(Boolean, nullable=False)
     resolved_at = Column(TIMESTAMP, nullable=True)

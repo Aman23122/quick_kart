@@ -23,6 +23,7 @@ def _run_migrations():
         "ALTER TABLE scheduled_po_template ADD COLUMN expected_receive_time VARCHAR(5) NULL",
         "ALTER TABLE inventory ADD COLUMN batch_no VARCHAR(100) NULL",
         "ALTER TABLE inventory ADD COLUMN dispatch_cutoff DATETIME NULL",
+        "ALTER TABLE alert_log ADD COLUMN batch_no VARCHAR(100) NULL",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

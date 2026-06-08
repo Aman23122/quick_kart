@@ -110,6 +110,7 @@ def check_dispatch_cutoff_alerts(db: Session) -> int:
             .filter(
                 AlertLog.variant_id == batch.variant_id,
                 AlertLog.alert_type == "dispatch_blocked",
+                AlertLog.batch_no == batch.batch_no,
                 AlertLog.is_resolved == False,
             )
             .first()
@@ -133,6 +134,7 @@ def check_dispatch_cutoff_alerts(db: Session) -> int:
                 variant_id=batch.variant_id,
                 fulfillment_center_id=fc_id,
                 alert_type="dispatch_blocked",
+                batch_no=batch.batch_no,
                 current_qty=batch.qty,
                 threshold_qty=0,
                 message=msg,
@@ -189,6 +191,7 @@ def _fire_pre_dispatch_alert_job(inventory_id: str) -> None:
             .filter(
                 AlertLog.variant_id == batch.variant_id,
                 AlertLog.alert_type == "approaching_dispatch_cutoff",
+                AlertLog.batch_no == batch.batch_no,
                 AlertLog.is_resolved == False,
             )
             .first()
@@ -216,6 +219,7 @@ def _fire_pre_dispatch_alert_job(inventory_id: str) -> None:
                 variant_id=batch.variant_id,
                 fulfillment_center_id=batch.fulfillment_center_id,
                 alert_type="approaching_dispatch_cutoff",
+                batch_no=batch.batch_no,
                 current_qty=batch.qty,
                 threshold_qty=0,
                 message=msg,
