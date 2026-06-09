@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react'
-import { type ReactNode } from 'react'
+import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { useNotificationStore } from '@/store/useNotificationStore'
 
-interface AppShellProps {
-  children: ReactNode
-}
-
-export default function AppShell({ children }: AppShellProps) {
+export default function AppShell() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const fetchNotifications = useNotificationStore((s) => s.fetch)
 
@@ -20,7 +16,6 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
-      {/* Sidebar */}
       <div
         className="flex-shrink-0 h-full z-20"
         onMouseEnter={() => setSidebarExpanded(true)}
@@ -29,11 +24,10 @@ export default function AppShell({ children }: AppShellProps) {
         <Sidebar expanded={sidebarExpanded} />
       </div>
 
-      {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 h-full">
         <Topbar />
         <main className="flex-1 overflow-y-auto px-6 py-6">
-          {children}
+          <Outlet />
         </main>
       </div>
     </div>

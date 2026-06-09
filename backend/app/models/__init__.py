@@ -10,6 +10,7 @@ from app.models.order import SalesOrder, OrderLineItem
 from app.models.system_config import SystemConfig
 from app.models.draft_po import DraftPO
 from app.models.scheduled_po_template import ScheduledPOTemplate
+from app.models.user import User
 
 __all__ = [
     "Brand", "Category", "Subcategory", "Vendor",
@@ -19,4 +20,5 @@ __all__ = [
     "AlertThreshold", "AlertLog",
     "SalesOrder", "OrderLineItem",
     "SystemConfig", "DraftPO", "ScheduledPOTemplate",
+    "User",
 ]

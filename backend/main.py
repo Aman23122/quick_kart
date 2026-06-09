@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -10,10 +10,10 @@ from sqlalchemy import text
 from app.database import engine
 from app.models import *  # noqa: F401, F403 — registers all ORM models
 from app.database import Base
+from app.auth.dependencies import get_current_user
 
 
 def _run_migrations():
-    """Add new nullable columns to existing tables without dropping data."""
     migrations = [
         "ALTER TABLE procurement ADD COLUMN expected_receive_time VARCHAR(5) NULL",
         "ALTER TABLE procurement MODIFY COLUMN vendor_invoice_number BIGINT NULL",
@@ -31,22 +31,23 @@ def _run_migrations():
                 conn.execute(text(stmt))
                 conn.commit()
             except Exception:
-                pass  # Column already exists
+                pass
+
+
 from app.routers import inbound, outbound, inventory, alerts, po, config, dashboard, vendors, products
+from app.routers.auth_router import router as auth_router
+from app.routers.user_router import router as user_router
 from app.services.po_scheduler import scheduler, setup_jobs
 from app.config import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create any missing tables (new tables like draft_po, system_config)
     Base.metadata.create_all(bind=engine)
     _run_migrations()
 
-    # Start APScheduler
     setup_jobs()
 
-    # Check dispatch cutoff expiry every 15 minutes
     from app.services.shelf_life_checker import check_dispatch_cutoff_alerts, schedule_pre_dispatch_alert
     from app.models.inventory import Inventory as InventoryModel
     from app.database import SessionLocal
@@ -66,8 +67,6 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
 
-    # On startup: re-schedule pre-dispatch alerts for any existing batches
-    # (covers server restarts — DateTrigger jobs don't survive restarts)
     def _reschedule_existing_batches():
         from datetime import datetime as _dt
         db = SessionLocal()
@@ -112,15 +111,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(inbound.router)
-app.include_router(outbound.router)
-app.include_router(inventory.router)
-app.include_router(alerts.router)
-app.include_router(po.router)
-app.include_router(config.router)
-app.include_router(dashboard.router)
-app.include_router(vendors.router)
-app.include_router(products.router)
+# Public routes (no auth required)
+app.include_router(auth_router)
+
+# User management (auth enforced inside each endpoint via require_super_admin / require_admin_or_super)
+app.include_router(user_router)
+
+# All existing business routes require a valid session
+_auth = [Depends(get_current_user)]
+app.include_router(inbound.router, dependencies=_auth)
+app.include_router(outbound.router, dependencies=_auth)
+app.include_router(inventory.router, dependencies=_auth)
+app.include_router(alerts.router, dependencies=_auth)
+app.include_router(po.router, dependencies=_auth)
+app.include_router(config.router, dependencies=_auth)
+app.include_router(dashboard.router, dependencies=_auth)
+app.include_router(vendors.router, dependencies=_auth)
+app.include_router(products.router, dependencies=_auth)
 
 
 @app.get("/")

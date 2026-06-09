@@ -10,6 +10,15 @@ class Settings(BaseSettings):
     FULFILLMENT_CENTER_ID: str = "FC-001"
     APP_PORT: int = 8000
 
+    SUPER_ADMIN_USERNAME: str = "superadmin"
+    SUPER_ADMIN_PASSWORD: str = "Admin@1234"
+    SUPER_ADMIN_EMAIL: str = "superadmin@quickkart.com"
+    SUPER_ADMIN_PHONE: str = "0000000000"
+
+    JWT_SECRET_KEY: str = "change-this-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 1440
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property

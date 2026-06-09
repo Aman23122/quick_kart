@@ -24,7 +24,16 @@
       "Bash(python -c ' *)",
       "Bash(python3 -c ' *)",
       "Bash(python seed/seed_config.py)",
-      "Bash(MYSQL_PWD=12345678 mysql -uroot inventory_sales_db)"
+      "Bash(MYSQL_PWD=12345678 mysql -uroot inventory_sales_db)",
+      "Bash(curl -s -c /tmp/qk_admin.txt -X POST http://localhost:8001/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"testadmin\",\"password\":\"Test@1234\"}')",
+      "Bash(curl -s -b /tmp/qk_admin.txt -X POST http://localhost:8001/api/users/ -H 'Content-Type: application/json' -d '{\"username\":\"inspector1\",\"email\":\"inspector1@qk.com\",\"phone\":\"1111111111\",\"password\":\"Insp@1234\",\"role\":\"inspector\"}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -b /tmp/qk2.txt http://localhost:8001/api/users/pending)",
+      "Bash(curl -s -X POST http://localhost:8001/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"inspector1\",\"password\":\"Insp@1234\"}')",
+      "Bash(curl -s -b /tmp/qk2.txt -X PATCH http://localhost:8001/api/users/2/approve)",
+      "Bash(curl -s -c /tmp/qk_insp.txt -X POST http://localhost:8001/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"inspector1\",\"password\":\"Insp@1234\"}')",
+      "Bash(curl -s -b /tmp/qk2.txt -X DELETE http://localhost:8001/api/users/1)",
+      "Bash(curl -s -X POST http://localhost:8001/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"testadmin\",\"password\":\"Test@1234\"}')"
     ]
   }
 }
