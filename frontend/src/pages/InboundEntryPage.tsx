@@ -382,7 +382,6 @@ export default function InboundEntryPage() {
           <div className="flex items-center gap-2">
             <Link2 size={15} className="text-blue-500" />
             <p className="text-sm font-semibold text-slate-700">Link to Purchase Order</p>
-            <span className="text-xs text-slate-400">(optional)</span>
           </div>
 
           {selectedPO ? (

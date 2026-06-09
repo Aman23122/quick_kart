@@ -21,6 +21,7 @@ type StatusKey =
 
 const statusStyles: Record<string, string> = {
   accepted: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  confirmed: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   fulfilled: 'bg-blue-100 text-blue-700 border-blue-200',
   placed: 'bg-blue-100 text-blue-700 border-blue-200',
   sent: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -41,6 +42,7 @@ const statusStyles: Record<string, string> = {
 
 const statusLabels: Record<string, string> = {
   accepted: 'Accepted',
+  confirmed: 'Confirmed',
   rejected: 'Rejected',
   blocked: 'Blocked',
   fulfilled: 'Fulfilled',

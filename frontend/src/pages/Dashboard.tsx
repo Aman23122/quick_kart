@@ -34,6 +34,7 @@ interface DashboardSummary {
 
 interface InboundDetailRow {
   procurement_id: string
+  status: string
   po_number: string
   vendor_name: string
   product_name: string
@@ -48,6 +49,7 @@ interface InboundDetailRow {
 
 interface OutboundDetailRow {
   order_id: string
+  order_status: string
   customer_name: string
   product_name: string
   brand_name: string
@@ -409,12 +411,13 @@ export default function Dashboard() {
           {!inboundDetail ? (
             <div className="py-8 text-center text-slate-400 text-sm">Loading…</div>
           ) : inboundDetail.data.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-sm">No approved inbound shipments today.</div>
+            <div className="py-8 text-center text-slate-400 text-sm">No inbound shipments today.</div>
           ) : (
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-slate-400 uppercase tracking-wide border-b border-slate-100">
                   <th className="pb-2 text-left">PO #</th>
+                  <th className="pb-2 text-left">Status</th>
                   <th className="pb-2 text-left">Vendor</th>
                   <th className="pb-2 text-left">Product</th>
                   <th className="pb-2 text-left">Brand</th>
@@ -430,6 +433,7 @@ export default function Dashboard() {
                 {inboundDetail.data.map((r, i) => (
                   <tr key={i} className="hover:bg-slate-50">
                     <td className="py-2 font-mono text-slate-600">{r.po_number}</td>
+                    <td className="py-2"><StatusBadge status={r.status} /></td>
                     <td className="py-2 text-slate-700">{r.vendor_name}</td>
                     <td className="py-2 font-medium text-slate-800">{r.product_name}</td>
                     <td className="py-2 text-blue-600">{r.brand_name}</td>
@@ -444,7 +448,7 @@ export default function Dashboard() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-slate-200">
-                  <td colSpan={8} className="pt-3 text-right font-semibold text-slate-600 text-xs uppercase tracking-wide">Grand Total</td>
+                  <td colSpan={9} className="pt-3 text-right font-semibold text-slate-600 text-xs uppercase tracking-wide">Grand Total (Approved)</td>
                   <td className="pt-3 text-right font-bold text-emerald-700">{formatCurrency(inboundDetail.total_value)}</td>
                   <td />
                 </tr>
@@ -465,12 +469,13 @@ export default function Dashboard() {
           {!outboundDetail ? (
             <div className="py-8 text-center text-slate-400 text-sm">Loading…</div>
           ) : outboundDetail.data.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-sm">No confirmed orders dispatched today.</div>
+            <div className="py-8 text-center text-slate-400 text-sm">No orders today.</div>
           ) : (
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-slate-400 uppercase tracking-wide border-b border-slate-100">
                   <th className="pb-2 text-left">Order ID</th>
+                  <th className="pb-2 text-left">Status</th>
                   <th className="pb-2 text-left">Customer</th>
                   <th className="pb-2 text-left">Product</th>
                   <th className="pb-2 text-left">Brand</th>
@@ -485,6 +490,7 @@ export default function Dashboard() {
                 {outboundDetail.data.map((r, i) => (
                   <tr key={i} className="hover:bg-slate-50">
                     <td className="py-2 font-mono text-slate-500">{r.order_id.slice(0, 12)}…</td>
+                    <td className="py-2"><StatusBadge status={r.order_status} /></td>
                     <td className="py-2 font-medium text-slate-800">{r.customer_name}</td>
                     <td className="py-2 text-slate-700">{r.product_name}</td>
                     <td className="py-2 text-blue-600">{r.brand_name}</td>
@@ -498,7 +504,7 @@ export default function Dashboard() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-slate-200">
-                  <td colSpan={7} className="pt-3 text-right font-semibold text-slate-600 text-xs uppercase tracking-wide">Grand Total</td>
+                  <td colSpan={8} className="pt-3 text-right font-semibold text-slate-600 text-xs uppercase tracking-wide">Grand Total (Confirmed)</td>
                   <td className="pt-3 text-right font-bold text-blue-700">{formatCurrency(outboundDetail.total_value)}</td>
                   <td />
                 </tr>

@@ -100,14 +100,13 @@ def get_summary(db: Session = Depends(get_db)):
 
 @router.get("/today-inbound")
 def get_today_inbound_detail(db: Session = Depends(get_db)):
-    """Line-level breakdown of all approved inbound stock received today."""
+    """Line-level breakdown of all inbound shipments today (all statuses)."""
     today = date.today()
     rows = (
         db.query(Procurement, ProcurementItem)
         .join(ProcurementItem, ProcurementItem.procurement_id == Procurement.procurement_id)
         .filter(
             func.date(Procurement.created_at) == today,
-            Procurement.status == "approved",
         )
         .order_by(Procurement.created_at)
         .all()
@@ -121,6 +120,7 @@ def get_today_inbound_detail(db: Session = Depends(get_db)):
         vendor = db.get(Vendor, proc.vendor_id)
         result.append({
             "procurement_id": proc.procurement_id,
+            "status": proc.status,
             "po_number": proc.po_number,
             "vendor_name": vendor.name if vendor else proc.vendor_id,
             "product_name": product.product_name if product else "",
@@ -133,20 +133,19 @@ def get_today_inbound_detail(db: Session = Depends(get_db)):
             "received_at": format_ts(proc.created_at),
         })
 
-    total_value = sum(r["total_cost"] for r in result)
+    total_value = sum(r["total_cost"] for r in result if r["status"] == "approved")
     return {"total_value": round(total_value, 2), "data": result}
 
 
 @router.get("/today-outbound")
 def get_today_outbound_detail(db: Session = Depends(get_db)):
-    """Line-level breakdown of all confirmed outbound orders dispatched today."""
+    """Line-level breakdown of all outbound orders created today (all statuses)."""
     today = date.today()
     rows = (
         db.query(SalesOrder, OrderLineItem)
         .join(OrderLineItem, OrderLineItem.order_id == SalesOrder.order_id)
         .filter(
             func.date(SalesOrder.created_at) == today,
-            SalesOrder.order_status == "confirmed",
         )
         .order_by(SalesOrder.created_at)
         .all()
@@ -159,6 +158,7 @@ def get_today_outbound_detail(db: Session = Depends(get_db)):
         brand = db.get(Brand, product.brand_id) if product and product.brand_id else None
         result.append({
             "order_id": order.order_id,
+            "order_status": order.order_status,
             "customer_name": order.order_instruction or order.user_id,
             "product_name": product.product_name if product else "",
             "brand_name": brand.name if brand else "",
@@ -169,7 +169,7 @@ def get_today_outbound_detail(db: Session = Depends(get_db)):
             "dispatched_at": format_ts(order.updated_at or order.created_at),
         })
 
-    total_value = sum(r["total_price"] for r in result)
+    total_value = sum(r["total_price"] for r in result if r["order_status"] == "confirmed")
     return {"total_value": round(total_value, 2), "data": result}
 
 
