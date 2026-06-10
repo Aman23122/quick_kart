@@ -85,18 +85,18 @@ export default function SuperAdminDashboard() {
           <button
             key={to}
             onClick={() => navigate(to)}
-            className="relative p-7 rounded-2xl text-white text-left transition-all shadow-md hover:shadow-xl cursor-pointer hover:-translate-y-0.5 duration-200"
+            className="relative p-10 rounded-2xl text-white text-left transition-all shadow-md hover:shadow-xl cursor-pointer hover:-translate-y-0.5 duration-200"
             style={{ background: accent }}
           >
             {badge !== null && (
-              <span className="absolute top-5 right-5 min-w-[28px] h-7 bg-white/20 border border-white/30 text-white text-sm font-bold rounded-full flex items-center justify-center px-2">
+              <span className="absolute top-6 right-6 min-w-[28px] h-7 bg-white/20 border border-white/30 text-white text-sm font-bold rounded-full flex items-center justify-center px-2">
                 {badge}
               </span>
             )}
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 shadow" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              <Icon size={22} className="text-white" />
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 shadow" style={{ background: 'rgba(255,255,255,0.2)' }}>
+              <Icon size={26} className="text-white" />
             </div>
-            <h3 className="font-semibold text-base mb-1.5">{title}</h3>
+            <h3 className="font-semibold text-lg mb-2">{title}</h3>
             <p className="text-sm opacity-75 leading-snug">{subtitle}</p>
           </button>
         ))}
