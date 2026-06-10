@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Eye, EyeOff, Info, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Info, CheckCircle, UserPlus } from 'lucide-react'
 import { useAuthStore } from '@/store/useAuthStore'
 import api from '@/lib/axios'
+import SelectBrand from '@/components/shared/SelectBrand'
 
 const ROLES = [
   { value: 'admin', label: 'Admin' },
@@ -11,9 +12,6 @@ const ROLES = [
   { value: 'po_executor', label: 'PO Executor' },
   { value: 'inspector', label: 'Inspector' },
 ]
-
-const INPUT_CLASS =
-  'w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm'
 
 export default function CreateUserPage() {
   const user = useAuthStore((s) => s.user)
@@ -53,133 +51,135 @@ export default function CreateUserPage() {
   }
 
   return (
-    <div className="max-w-lg">
-      <button
-        onClick={goBack}
-        className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-6 text-sm transition-colors"
-      >
-        <ArrowLeft size={16} /> Back
-      </button>
+    <div className="flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 7rem)' }}>
 
-      <h1 className="text-xl font-bold text-slate-800 mb-1">Create New User</h1>
-      <p className="text-sm text-slate-500 mb-6">
-        Add a new team member with a designated role
-      </p>
+      {/* Card */}
+      <div className="w-full max-w-lg card-brand">
 
-      {isAdmin && (
-        <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 text-sm text-amber-700">
-          <Info size={15} className="mt-0.5 flex-shrink-0" />
-          <span>
-            This user request will be sent to the super admin for approval before they can login.
-          </span>
+        {/* Header strip */}
+        <div
+          className="px-6 py-4 flex items-center gap-3 rounded-t-[1rem] overflow-hidden"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(255,255,255,0.13) 1px, transparent 1px) 0 0 / 18px 18px, linear-gradient(135deg, var(--brand-500), var(--brand-600))',
+          }}
+        >
+          <button
+            onClick={goBack}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.15)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+            title="Back"
+          >
+            <ArrowLeft size={15} className="text-white" />
+          </button>
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.2)' }}
+          >
+            <UserPlus size={18} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-white leading-tight">Create New User</h1>
+            <p className="text-xs text-white/70 mt-0.5">
+              {isAdmin
+                ? 'Request will be sent for super admin approval'
+                : 'Add a team member with a designated role'}
+            </p>
+          </div>
         </div>
-      )}
 
-      {success && (
-        <div className="flex items-start gap-2.5 bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-5 text-sm text-emerald-700">
-          <CheckCircle size={15} className="mt-0.5 flex-shrink-0" />
-          <span>
-            {isAdmin
-              ? 'User request submitted successfully. Awaiting super admin approval.'
-              : 'User created successfully. They can now log in.'}
-          </span>
-        </div>
-      )}
+        <div className="px-6 py-5">
 
-      <div className="card-brand p-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Username</label>
-            <input
-              type="text"
-              value={form.username}
-              onChange={set('username')}
-              required
-              className={INPUT_CLASS}
-              placeholder="e.g. john_doe"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={set('email')}
-              required
-              className={INPUT_CLASS}
-              placeholder="e.g. john@example.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone Number</label>
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={set('phone')}
-              required
-              className={INPUT_CLASS}
-              placeholder="e.g. 9876543210"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={form.password}
-                onChange={set('password')}
-                required
-                minLength={6}
-                className={INPUT_CLASS + ' pr-10'}
-                placeholder="Minimum 6 characters"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Role</label>
-            <select
-              value={form.role}
-              onChange={set('role')}
-              required
-              className={INPUT_CLASS + ' cursor-pointer'}
+          {/* Banners */}
+          {isAdmin && !success && (
+            <div
+              className="flex items-start gap-2 rounded-lg p-3 text-xs mb-4"
+              style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', color: 'var(--brand-700)' }}
             >
-              {ROLES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {error && (
-            <div className="bg-rose-50 border border-rose-200 rounded-lg px-3.5 py-2.5 text-sm text-rose-700">
-              {error}
+              <Info size={13} className="mt-0.5 flex-shrink-0" />
+              This request will be sent to the super admin for approval before the user can log in.
+            </div>
+          )}
+          {success && (
+            <div className="flex items-start gap-2 rounded-lg p-3 text-xs mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700">
+              <CheckCircle size={13} className="mt-0.5 flex-shrink-0" />
+              {isAdmin
+                ? 'Request submitted. Awaiting super admin approval.'
+                : 'User created successfully. They can now log in.'}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
-          >
-            {loading
-              ? 'Creating...'
-              : isAdmin
-              ? 'Submit for Approval'
-              : 'Create User'}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Username</label>
+                <input type="text" value={form.username} onChange={set('username')} required placeholder="e.g. john_doe" className="input-brand" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+                <input type="email" value={form.email} onChange={set('email')} required placeholder="e.g. john@example.com" className="input-brand" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                <input type="tel" value={form.phone} onChange={set('phone')} required placeholder="e.g. 9876543210" className="input-brand" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={set('password')}
+                    required
+                    minLength={6}
+                    placeholder="Min 6 characters"
+                    className="input-brand"
+                    style={{ paddingRight: '2.5rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                    style={{ color: '#94a3b8' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--brand-600)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Role</label>
+                <SelectBrand
+                  value={form.role}
+                  onChange={(val) => setForm((prev) => ({ ...prev, role: val }))}
+                  options={ROLES}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs mb-3 bg-rose-50 border border-rose-200 text-rose-700">
+                <span className="flex-shrink-0">⚠</span>
+                {error}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} className="btn-brand">
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  {isAdmin ? 'Submitting...' : 'Creating...'}
+                </span>
+              ) : isAdmin ? 'Submit for Approval' : 'Create User'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )
