@@ -52,13 +52,20 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
   return (
     <aside
       className={cn(
-        'flex flex-col h-full bg-slate-900 transition-all duration-300 overflow-hidden',
+        'flex flex-col h-full transition-all duration-300 overflow-hidden',
         expanded ? 'w-[220px]' : 'w-[64px]'
       )}
+      style={{ background: 'var(--brand-800)' }}
     >
       {/* Brand */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-700/50">
-        <div className="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg">
+      <div
+        className="flex items-center gap-3 px-4 py-5 border-b"
+        style={{ borderColor: 'rgba(218,236,223,0.12)' }}
+      >
+        <div
+          className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center shadow-lg"
+          style={{ background: 'var(--brand-600)' }}
+        >
           <Zap size={16} className="text-white" />
         </div>
         {expanded && (
@@ -83,25 +90,29 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group mb-1',
                   isActive
-                    ? 'bg-blue-600 text-white shadow-md'
+                    ? 'text-white shadow-md'
                     : isAdminPanel
-                    ? 'text-blue-400 hover:bg-blue-900/40 hover:text-blue-300 border border-blue-800/50'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                    ? 'border'
+                    : ''
                 )}
+                style={
+                  isActive
+                    ? { background: 'var(--brand-600)' }
+                    : isAdminPanel
+                    ? { color: 'var(--brand-300)', borderColor: 'rgba(218,236,223,0.2)' }
+                    : { color: 'rgba(218,236,223,0.55)' }
+                }
               >
-                <Icon
-                  size={18}
-                  className={cn(
-                    'flex-shrink-0 transition-colors',
-                    isActive ? 'text-white' : isAdminPanel ? 'text-blue-400 group-hover:text-blue-300' : 'text-slate-400 group-hover:text-slate-100'
-                  )}
-                />
+                <Icon size={18} className="flex-shrink-0 transition-colors" />
                 {expanded && (
                   <span className="text-sm font-medium whitespace-nowrap">{label}</span>
                 )}
               </NavLink>
               {isAdminPanel && (
-                <div className="border-t border-slate-700/50 mb-1" />
+                <div
+                  className="border-t mb-1"
+                  style={{ borderColor: 'rgba(218,236,223,0.12)' }}
+                />
               )}
             </div>
           )
@@ -109,27 +120,50 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
       </nav>
 
       {/* Footer — user info + logout */}
-      <div className="px-2 pb-4 border-t border-slate-700/50 pt-3 space-y-1">
+      <div
+        className="px-2 pb-4 border-t pt-3 space-y-1"
+        style={{ borderColor: 'rgba(218,236,223,0.12)' }}
+      >
         {expanded ? (
           <>
             <div className="px-3 py-1.5">
-              <p className="text-xs text-slate-400 truncate">{user?.username}</p>
-              <p className="text-[10px] text-slate-600 capitalize mt-0.5">
+              <p className="text-xs truncate" style={{ color: 'var(--brand-200)' }}>
+                {user?.username}
+              </p>
+              <p className="text-[10px] capitalize mt-0.5" style={{ color: 'var(--brand-400)' }}>
                 {user?.role?.replace(/_/g, ' ')}
               </p>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all duration-150 group"
+              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg transition-all duration-150"
+              style={{ color: 'rgba(218,236,223,0.55)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(218,236,223,0.08)'
+                e.currentTarget.style.color = '#fff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = 'rgba(218,236,223,0.55)'
+              }}
             >
-              <LogOut size={18} className="flex-shrink-0 text-slate-400 group-hover:text-slate-100 transition-colors" />
+              <LogOut size={18} className="flex-shrink-0" />
               <span className="text-sm font-medium whitespace-nowrap">Logout</span>
             </button>
           </>
         ) : (
           <button
             onClick={handleLogout}
-            className="flex items-center justify-center w-full p-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all duration-150"
+            className="flex items-center justify-center w-full p-2.5 rounded-lg transition-all duration-150"
+            style={{ color: 'rgba(218,236,223,0.55)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(218,236,223,0.08)'
+              e.currentTarget.style.color = '#fff'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = 'rgba(218,236,223,0.55)'
+            }}
             title="Logout"
           >
             <LogOut size={18} />

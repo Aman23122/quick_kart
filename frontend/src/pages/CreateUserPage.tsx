@@ -86,7 +86,7 @@ export default function CreateUserPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <div className="card-brand p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Username</label>

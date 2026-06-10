@@ -79,7 +79,7 @@ export default function PendingApprovalsPage() {
       {loading ? (
         <div className="text-slate-400 text-sm">Loading...</div>
       ) : users.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
+        <div className="card-brand p-12 text-center">
           <CheckCircle size={40} className="text-emerald-400 mx-auto mb-3" />
           <p className="text-slate-600 font-medium">No pending approvals</p>
           <p className="text-slate-400 text-sm mt-1">All user requests have been reviewed.</p>
@@ -89,7 +89,7 @@ export default function PendingApprovalsPage() {
           {users.map((u) => (
             <div
               key={u.id}
-              className="bg-white rounded-xl border border-slate-100 p-5 flex items-center justify-between shadow-sm"
+              className="card-brand p-5 flex items-center justify-between"
             >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">

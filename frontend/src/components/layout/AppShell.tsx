@@ -15,7 +15,7 @@ export default function AppShell() {
   }, [fetchNotifications])
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
+    <div className="flex h-screen w-screen overflow-hidden" style={{ background: 'var(--brand-50)' }}>
       <div
         className="flex-shrink-0 h-full z-20"
         onMouseEnter={() => setSidebarExpanded(true)}

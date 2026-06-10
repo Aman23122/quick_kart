@@ -104,14 +104,14 @@ export default function ManageUsersPage() {
       {loading ? (
         <div className="text-slate-400 text-sm">Loading...</div>
       ) : users.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center text-slate-400 text-sm">
+        <div className="card-brand p-12 text-center text-slate-400 text-sm">
           No users found. Create one from the dashboard.
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="card-brand overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
+              <tr className="border-b" style={{ borderColor: 'var(--brand-200)', background: 'var(--brand-50)' }}>
                 <th className="text-left px-5 py-3.5 font-semibold text-slate-600">User</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-slate-600">Role</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-slate-600">Status</th>
