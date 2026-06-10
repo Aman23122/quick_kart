@@ -29,16 +29,13 @@ export default function PendingApprovalsPage() {
 
   const fetchPending = () => {
     setLoading(true)
-    api
-      .get('/api/users/pending')
+    api.get('/api/users/pending')
       .then(({ data }) => setUsers(data))
       .catch(() => {})
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    fetchPending()
-  }, [])
+  useEffect(() => { fetchPending() }, [])
 
   const handleApprove = async (id: number) => {
     setActionId(id)
@@ -60,49 +57,57 @@ export default function PendingApprovalsPage() {
 
   return (
     <div>
+      {/* Back */}
       <button
         onClick={() => navigate('/super-admin')}
-        className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-6 text-sm transition-colors"
+        className="flex items-center gap-2 text-sm mb-5 transition-colors"
+        style={{ color: 'var(--brand-700)' }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--brand-800)')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--brand-700)')}
       >
-        <ArrowLeft size={16} /> Back to Dashboard
+        <ArrowLeft size={15} /> Back to Dashboard
       </button>
 
-      <div className="flex items-center gap-3 mb-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-5">
         <h1 className="text-xl font-bold text-slate-800">Pending Approvals</h1>
         {users.length > 0 && (
-          <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
-            {users.length}
-          </span>
+          <span className="badge-brand">{users.length}</span>
         )}
       </div>
 
       {loading ? (
-        <div className="text-slate-400 text-sm">Loading...</div>
+        <div className="text-sm" style={{ color: 'var(--brand-500)' }}>Loading...</div>
       ) : users.length === 0 ? (
         <div className="card-brand p-12 text-center">
-          <CheckCircle size={40} className="text-emerald-400 mx-auto mb-3" />
-          <p className="text-slate-600 font-medium">No pending approvals</p>
+          <CheckCircle size={40} className="mx-auto mb-3" style={{ color: 'var(--brand-400)' }} />
+          <p className="font-medium text-slate-700">No pending approvals</p>
           <p className="text-slate-400 text-sm mt-1">All user requests have been reviewed.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {users.map((u) => (
-            <div
-              key={u.id}
-              className="card-brand p-5 flex items-center justify-between"
-            >
+            <div key={u.id} className="card-brand p-5 flex items-center justify-between">
+
+              {/* User info */}
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Clock size={18} className="text-amber-600" />
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'var(--brand-100)' }}
+                >
+                  <Clock size={18} style={{ color: 'var(--brand-600)' }} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-800">{u.username}</span>
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-md">
+                    <span
+                      className="px-2 py-0.5 text-xs rounded-md font-medium"
+                      style={{ background: 'var(--brand-50)', color: 'var(--brand-700)', border: '1px solid var(--brand-200)' }}
+                    >
                       {ROLE_LABELS[u.role] ?? u.role}
                     </span>
                   </div>
-                  <div className="text-sm text-slate-500 mt-0.5">
+                  <div className="text-xs text-slate-500 mt-0.5">
                     {u.email} · {u.phone}
                     {u.created_by && (
                       <span className="ml-2 text-slate-400">· Requested by {u.created_by}</span>
@@ -111,11 +116,15 @@ export default function PendingApprovalsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 ml-4">
+              {/* Actions */}
+              <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                 <button
                   onClick={() => handleApprove(u.id)}
                   disabled={actionId === u.id}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-all"
+                  style={{ background: 'linear-gradient(135deg, var(--brand-500), var(--brand-600))' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'linear-gradient(135deg, var(--brand-600), var(--brand-700))')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'linear-gradient(135deg, var(--brand-500), var(--brand-600))')}
                 >
                   <CheckCircle size={15} />
                   Approve
@@ -123,7 +132,10 @@ export default function PendingApprovalsPage() {
                 <button
                   onClick={() => handleReject(u.id)}
                   disabled={actionId === u.id}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 text-rose-600 border border-rose-200 text-sm font-medium rounded-lg hover:bg-rose-100 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-50 transition-all"
+                  style={{ background: 'var(--brand-50)', color: 'var(--brand-700)', border: '1.5px solid var(--brand-300)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-100)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--brand-50)')}
                 >
                   <XCircle size={15} />
                   Reject
