@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trash2, Check, X } from 'lucide-react'
 import api from '@/lib/axios'
+import SelectBrand from '@/components/shared/SelectBrand'
 
 interface UserRow {
   id: number
@@ -31,10 +32,10 @@ const ROLE_LABELS: Record<string, string> = {
   inspector: 'Inspector',
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  pending: 'bg-amber-50 text-amber-700 border-amber-200',
-  rejected: 'bg-rose-50 text-rose-700 border-rose-200',
+const STATUS_STYLES: Record<string, React.CSSProperties> = {
+  approved: { background: 'var(--brand-50)', color: 'var(--brand-700)', borderColor: 'var(--brand-300)' },
+  pending:  { background: '#fffbeb', color: '#92400e', borderColor: '#fcd34d' },
+  rejected: { background: 'var(--brand-50)', color: 'var(--brand-600)', borderColor: 'var(--brand-200)' },
 }
 
 export default function ManageUsersPage() {
@@ -47,22 +48,14 @@ export default function ManageUsersPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => {
-    api
-      .get('/api/users/')
+    api.get('/api/users/')
       .then(({ data }) => setUsers(data))
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  const startEdit = (u: UserRow) => {
-    setEditingId(u.id)
-    setEditRole(u.role)
-  }
-
-  const cancelEdit = () => {
-    setEditingId(null)
-    setEditRole('')
-  }
+  const startEdit = (u: UserRow) => { setEditingId(u.id); setEditRole(u.role) }
+  const cancelEdit = () => { setEditingId(null); setEditRole('') }
 
   const saveRole = async (id: number) => {
     setSavingId(id)
@@ -86,23 +79,28 @@ export default function ManageUsersPage() {
 
   return (
     <div>
+      {/* Back */}
       <button
         onClick={() => navigate('/super-admin')}
-        className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-6 text-sm transition-colors"
+        className="flex items-center gap-2 text-sm mb-5 transition-colors"
+        style={{ color: 'var(--brand-700)' }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--brand-800)')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--brand-700)')}
       >
-        <ArrowLeft size={16} /> Back to Dashboard
+        <ArrowLeft size={15} /> Back to Dashboard
       </button>
 
-      <div className="flex items-center justify-between mb-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Manage Users</h1>
           <p className="text-sm text-slate-500 mt-0.5">Edit roles or remove users from the system</p>
         </div>
-        <span className="text-sm text-slate-400">{users.length} user{users.length !== 1 ? 's' : ''}</span>
+        <span className="badge-brand">{users.length} user{users.length !== 1 ? 's' : ''}</span>
       </div>
 
       {loading ? (
-        <div className="text-slate-400 text-sm">Loading...</div>
+        <div className="text-sm" style={{ color: 'var(--brand-500)' }}>Loading...</div>
       ) : users.length === 0 ? (
         <div className="card-brand p-12 text-center text-slate-400 text-sm">
           No users found. Create one from the dashboard.
@@ -112,58 +110,73 @@ export default function ManageUsersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b" style={{ borderColor: 'var(--brand-200)', background: 'var(--brand-50)' }}>
-                <th className="text-left px-5 py-3.5 font-semibold text-slate-600">User</th>
-                <th className="text-left px-5 py-3.5 font-semibold text-slate-600">Role</th>
-                <th className="text-left px-5 py-3.5 font-semibold text-slate-600">Status</th>
-                <th className="text-left px-5 py-3.5 font-semibold text-slate-600">Created By</th>
-                <th className="text-right px-5 py-3.5 font-semibold text-slate-600">Actions</th>
+                {['User', 'Role', 'Status', 'Created By', 'Actions'].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`px-5 py-3.5 font-semibold text-xs ${i === 4 ? 'text-right' : 'text-left'}`}
+                    style={{ color: 'var(--brand-700)' }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                <tr
+                  key={u.id}
+                  className="border-b transition-colors"
+                  style={{ borderColor: 'var(--brand-100)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-50)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {/* User */}
                   <td className="px-5 py-4">
                     <div className="font-medium text-slate-800">{u.username}</div>
                     <div className="text-slate-400 text-xs mt-0.5">{u.email}</div>
                   </td>
 
+                  {/* Role */}
                   <td className="px-5 py-4">
                     {editingId === u.id ? (
-                      <select
-                        value={editRole}
-                        onChange={(e) => setEditRole(e.target.value)}
-                        className="px-2.5 py-1.5 rounded-lg border border-blue-300 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r.value} value={r.value}>
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="w-44">
+                        <SelectBrand
+                          value={editRole}
+                          onChange={setEditRole}
+                          options={ROLES}
+                        />
+                      </div>
                     ) : (
                       <button
                         onClick={() => startEdit(u)}
-                        className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium hover:bg-slate-200 transition-colors"
+                        className="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+                        style={{ background: 'var(--brand-50)', color: 'var(--brand-700)', border: '1px solid var(--brand-200)' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-100)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--brand-50)')}
                       >
                         {ROLE_LABELS[u.role] ?? u.role}
                       </button>
                     )}
                   </td>
 
+                  {/* Status */}
                   <td className="px-5 py-4">
                     <span
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
-                        STATUS_STYLES[u.approval_status] ?? 'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}
+                      className="px-2.5 py-1 rounded-md text-xs font-medium border"
+                      style={
+                        !u.is_active
+                          ? { background: 'var(--brand-200)', color: 'var(--brand-800)', borderColor: 'var(--brand-400)' }
+                          : STATUS_STYLES[u.approval_status] ?? { background: 'var(--brand-50)', color: 'var(--brand-600)', borderColor: 'var(--brand-200)' }
+                      }
                     >
                       {u.is_active ? u.approval_status : 'deactivated'}
                     </span>
                   </td>
 
-                  <td className="px-5 py-4 text-slate-500 text-xs">
-                    {u.created_by ?? '—'}
-                  </td>
+                  {/* Created By */}
+                  <td className="px-5 py-4 text-slate-500 text-xs">{u.created_by ?? '—'}</td>
 
+                  {/* Actions */}
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1.5">
                       {editingId === u.id ? (
@@ -171,14 +184,20 @@ export default function ManageUsersPage() {
                           <button
                             onClick={() => saveRole(u.id)}
                             disabled={savingId === u.id}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                            style={{ color: 'var(--brand-600)' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-100)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                             title="Save"
                           >
                             <Check size={15} />
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="p-1.5 rounded-lg transition-colors"
+                            style={{ color: 'var(--brand-400)' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-50)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                             title="Cancel"
                           >
                             <X size={15} />
@@ -188,7 +207,16 @@ export default function ManageUsersPage() {
                         <button
                           onClick={() => deleteUser(u.id)}
                           disabled={deletingId === u.id}
-                          className="p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors disabled:opacity-50"
+                          className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                          style={{ color: 'var(--brand-400)' }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'var(--brand-100)'
+                            e.currentTarget.style.color = 'var(--brand-700)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent'
+                            e.currentTarget.style.color = 'var(--brand-400)'
+                          }}
                           title="Delete user"
                         >
                           <Trash2 size={15} />
