@@ -134,6 +134,34 @@ def get_pending_approvals(db: Session = Depends(get_db)):
         if cfg:
             temp_threshold = int(cfg.config_value)
 
+        on_time = None
+        on_time_diff_minutes = None
+        if proc.expected_receive_date:
+            actual_date = proc.actual_received_date or (proc.created_at.date() if proc.created_at else None)
+            if actual_date:
+                if proc.expected_receive_time:
+                    exp_time = dt_time(23, 59)
+                    try:
+                        h, m = proc.expected_receive_time.split(":")
+                        exp_time = dt_time(int(h), int(m))
+                    except ValueError:
+                        pass
+                    expected_dt = datetime.combine(proc.expected_receive_date, exp_time)
+                    actual_time = dt_time(23, 59)
+                    if proc.actual_received_time:
+                        try:
+                            h, m = proc.actual_received_time.split(":")
+                            actual_time = dt_time(int(h), int(m))
+                        except ValueError:
+                            pass
+                    actual_dt = datetime.combine(actual_date, actual_time)
+                    on_time = actual_dt <= expected_dt
+                    on_time_diff_minutes = int((expected_dt - actual_dt).total_seconds() / 60)
+                else:
+                    # No expected time — date-only comparison, no time diff shown
+                    on_time = actual_date <= proc.expected_receive_date
+                    on_time_diff_minutes = None
+
         result.append({
             "procurement_id": proc.procurement_id,
             "procurement_item_id": item.procurement_item_id,
@@ -155,6 +183,8 @@ def get_pending_approvals(db: Session = Depends(get_db)):
             "expiry_date": str(item.expiry_date) if item.expiry_date else None,
             "sell_before_date": str(item.sell_before_date),
             "created_at": format_ts(proc.created_at),
+            "on_time": on_time,
+            "on_time_diff_minutes": on_time_diff_minutes,
         })
 
     return {"total": len(result), "data": result}
@@ -256,7 +286,7 @@ def get_inbound_ledger(
     if date_from:
         q = q.filter(Procurement.created_at >= date_from)
     if date_to:
-        q = q.filter(Procurement.created_at <= date_to)
+        q = q.filter(Procurement.created_at < date_to + timedelta(days=1))
     if status:
         q = q.filter(Procurement.status == status)
 
@@ -267,34 +297,36 @@ def get_inbound_ledger(
     for proc, item in rows:
         variant = db.get(ProductVariant, item.variant_id)
         vendor = db.get(Vendor, proc.vendor_id)
+        product = db.get(Product, variant.product_id) if variant else None
 
-        # Compute on_time and diff: compare actual received datetime vs expected datetime
         on_time = None
         on_time_diff_minutes = None
         if proc.expected_receive_date:
-            exp_time = dt_time(23, 59)
-            if proc.expected_receive_time:
-                try:
-                    h, m = proc.expected_receive_time.split(":")
-                    exp_time = dt_time(int(h), int(m))
-                except ValueError:
-                    pass
-            expected_dt = datetime.combine(proc.expected_receive_date, exp_time)
-
-            # Use actual received date/time if available, else fall back to created_at
             actual_date = proc.actual_received_date or (proc.created_at.date() if proc.created_at else None)
             if actual_date:
-                actual_time = dt_time(23, 59)
-                if proc.actual_received_time:
+                if proc.expected_receive_time:
+                    # Expected time was specified — full datetime comparison
+                    exp_time = dt_time(23, 59)
                     try:
-                        h, m = proc.actual_received_time.split(":")
-                        actual_time = dt_time(int(h), int(m))
+                        h, m = proc.expected_receive_time.split(":")
+                        exp_time = dt_time(int(h), int(m))
                     except ValueError:
                         pass
-                actual_dt = datetime.combine(actual_date, actual_time)
-                on_time = actual_dt <= expected_dt
-                # positive = early (arrived before expected), negative = late
-                on_time_diff_minutes = int((expected_dt - actual_dt).total_seconds() / 60)
+                    expected_dt = datetime.combine(proc.expected_receive_date, exp_time)
+                    actual_time = dt_time(23, 59)
+                    if proc.actual_received_time:
+                        try:
+                            h, m = proc.actual_received_time.split(":")
+                            actual_time = dt_time(int(h), int(m))
+                        except ValueError:
+                            pass
+                    actual_dt = datetime.combine(actual_date, actual_time)
+                    on_time = actual_dt <= expected_dt
+                    on_time_diff_minutes = int((expected_dt - actual_dt).total_seconds() / 60)
+                else:
+                    # No expected time — date-only comparison, no time diff shown
+                    on_time = actual_date <= proc.expected_receive_date
+                    on_time_diff_minutes = None
 
         result.append({
             "procurement_id": proc.procurement_id,
@@ -303,6 +335,7 @@ def get_inbound_ledger(
             "vendor_id": proc.vendor_id,
             "variant_id": item.variant_id,
             "variant_name": variant.variant_name if variant else item.variant_id,
+            "product_name": product.product_name if product else "",
             "ordered_qty": item.ordered_qty,
             "received_qty": item.received_qty,
             "temperature_measured": item.temperature_measured,

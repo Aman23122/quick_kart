@@ -22,6 +22,7 @@ import POMonitor from '@/pages/POMonitor'
 import AlertLog from '@/pages/AlertLog'
 import Settings from '@/pages/Settings'
 import ProductsPage from '@/pages/ProductsPage'
+import ApprovalPage from '@/pages/ApprovalPage'
 
 function LoadingScreen() {
   return (
@@ -98,6 +99,7 @@ export default function App() {
         <Route path="/po" element={<POMonitor />} />
         <Route path="/alerts" element={<AlertLog />} />
         <Route path="/products" element={<ProductsPage />} />
+        <Route path="/approval" element={<ApprovalPage />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 

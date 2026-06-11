@@ -7,6 +7,7 @@ export interface InboundRow {
   vendor_id?: string
   variant_id?: string
   variant_name?: string
+  product_name?: string
   ordered_qty?: number
   received_qty?: number
   temperature_measured?: number
@@ -45,6 +46,8 @@ export interface PendingItem {
   expiry_date: string | null
   sell_before_date: string
   created_at: string
+  on_time: boolean | null
+  on_time_diff_minutes: number | null
 }
 
 export interface InboundLedgerParams {
