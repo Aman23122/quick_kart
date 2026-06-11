@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from '@/store/useAuthStore'
 
@@ -56,8 +56,11 @@ function RegularUserGuard() {
 
 export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth)
+  const didCheck = useRef(false)
 
   useEffect(() => {
+    if (didCheck.current) return
+    didCheck.current = true
     checkAuth()
   }, [checkAuth])
 
