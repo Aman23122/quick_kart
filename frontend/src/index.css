@@ -51,7 +51,7 @@
 
 /* QuickKart brand component classes — reuse anywhere */
 .bg-brand-page {
-  background: linear-gradient(135deg, var(--brand-100) 0%, var(--brand-200) 55%, var(--brand-300) 100%);
+  background: linear-gradient(135deg, var(--brand-50) 0%, var(--brand-100) 55%, var(--brand-300) 80%);
 }
 
 .input-brand {
