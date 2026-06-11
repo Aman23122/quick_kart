@@ -3,6 +3,7 @@ import api from '@/lib/axios'
 export interface OutboundRow {
   order_id?: string
   user_id?: string
+  product_name?: string
   variant_name?: string
   variant_id?: string
   quantity?: number

@@ -407,10 +407,12 @@ def get_outbound_ledger(
     result = []
     for order, line in rows:
         variant = db.get(ProductVariant, line.variant_id)
+        product = db.get(Product, variant.product_id) if variant else None
         result.append({
             "order_id": order.order_id,
             "customer_name": order.order_instruction or order.user_id,
             "variant_id": line.variant_id,
+            "product_name": product.product_name if product else "",
             "variant_name": variant.variant_name if variant else line.variant_id,
             "original_qty": line.original_qty or line.quantity,
             "quantity": line.quantity,

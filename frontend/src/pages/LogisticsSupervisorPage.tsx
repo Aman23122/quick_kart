@@ -182,7 +182,16 @@ const historyColumns: ColumnDef<OutboundRow>[] = [
     header: 'Customer',
     render: (r) => String(r.customer_name ?? r.user_id ?? '—'),
   },
-  { key: 'variant_name', header: 'Variant' },
+  {
+    key: 'variant_name',
+    header: 'Product / Variant',
+    render: (r) => (
+      <div>
+        {r.product_name && <div className="font-medium text-slate-800">{String(r.product_name)}</div>}
+        <div className="text-xs text-slate-400">{String(r.variant_name ?? '—')}</div>
+      </div>
+    ),
+  },
   {
     key: 'original_qty',
     header: 'Ordered',
