@@ -41,6 +41,8 @@ const statusStyles: Record<string, string> = {
   pending_approval: 'bg-amber-100 text-amber-700 border-amber-200',
   admin_approved: 'bg-blue-100 text-blue-700 border-blue-200',
   approved: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  dispatched: 'bg-violet-100 text-violet-700 border-violet-200',
+  cancelled: 'bg-rose-100 text-rose-700 border-rose-200',
 }
 
 const statusLabels: Record<string, string> = {
@@ -62,6 +64,8 @@ const statusLabels: Record<string, string> = {
   pending_approval: 'Pending Approval',
   admin_approved: 'Admin Approved',
   approved: 'Warehouse Confirmed',
+  dispatched: 'Dispatched',
+  cancelled: 'Cancelled',
   green: 'Healthy',
   orange: 'Warning',
   red: 'Critical',

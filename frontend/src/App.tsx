@@ -23,6 +23,7 @@ import AlertLog from '@/pages/AlertLog'
 import Settings from '@/pages/Settings'
 import ProductsPage from '@/pages/ProductsPage'
 import ApprovalPage from '@/pages/ApprovalPage'
+import LogisticsSupervisorPage from '@/pages/LogisticsSupervisorPage'
 
 function LoadingScreen() {
   return (
@@ -100,6 +101,7 @@ export default function App() {
         <Route path="/alerts" element={<AlertLog />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/approval" element={<ApprovalPage />} />
+        <Route path="/logistics" element={<LogisticsSupervisorPage />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 

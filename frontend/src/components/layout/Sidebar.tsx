@@ -8,6 +8,7 @@ import {
   Warehouse,
   ClipboardList,
   ClipboardCheck,
+  Truck,
   Bell,
   Settings,
   Zap,
@@ -20,6 +21,7 @@ import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/useAuthStore'
 import { getPendingApprovals, getAdminApproved } from '@/services/inboundApi'
+import { getConfirmedOrders } from '@/services/outboundApi'
 
 const baseNavItems = [
   { to: '/super-admin', label: 'Super Admin Panel', icon: Shield, exact: true, roles: ['super_admin'] as string[] | null },
@@ -28,6 +30,7 @@ const baseNavItems = [
   { to: '/stock-entry', label: 'Stock Entry', icon: PackagePlus, exact: false, roles: null },
   { to: '/inbound', label: 'Inbound', icon: PackageCheck, exact: false, roles: null },
   { to: '/approval', label: 'Approval', icon: ClipboardCheck, exact: false, roles: null },
+  { to: '/logistics', label: 'Logistics', icon: Truck, exact: false, roles: null },
   { to: '/sales-order', label: 'Sales Order', icon: ShoppingCart, exact: false, roles: null },
   { to: '/outbound', label: 'Outbound', icon: PackageOpen, exact: false, roles: null },
   { to: '/inventory', label: 'Inventory', icon: Warehouse, exact: false, roles: null },
@@ -59,6 +62,14 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
     staleTime: 10000,
   })
   const inboundCount = adminApprovedData?.total ?? 0
+
+  const { data: confirmedData } = useQuery({
+    queryKey: ['confirmed-orders'],
+    queryFn: () => getConfirmedOrders().then((r) => r.data),
+    refetchInterval: 15000,
+    staleTime: 10000,
+  })
+  const logisticsCount = confirmedData?.total ?? 0
 
   const navItems = baseNavItems.filter(
     (item) => item.roles === null || (user?.role && item.roles.includes(user.role))
@@ -131,6 +142,9 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
                   {to === '/inbound' && inboundCount > 0 && !expanded && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-400" style={{ background: 'var(--brand-400)' }} />
                   )}
+                  {to === '/logistics' && logisticsCount > 0 && !expanded && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-violet-400" />
+                  )}
                 </div>
                 {expanded && (
                   <span className="text-sm font-medium whitespace-nowrap flex-1">{label}</span>
@@ -143,6 +157,11 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
                 {expanded && to === '/inbound' && inboundCount > 0 && (
                   <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full text-white leading-none" style={{ background: 'var(--brand-500)' }}>
                     {inboundCount}
+                  </span>
+                )}
+                {expanded && to === '/logistics' && logisticsCount > 0 && (
+                  <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-violet-500 text-white leading-none">
+                    {logisticsCount}
                   </span>
                 )}
               </NavLink>

@@ -25,6 +25,8 @@ def _run_migrations():
         "ALTER TABLE inventory ADD COLUMN dispatch_cutoff DATETIME NULL",
         "ALTER TABLE alert_log ADD COLUMN batch_no VARCHAR(100) NULL",
         "ALTER TABLE procurement_item ADD COLUMN damaged_qty INT NOT NULL DEFAULT 0",
+        "ALTER TABLE order_line_item ADD COLUMN original_qty INT NULL",
+        "ALTER TABLE order_line_item ADD COLUMN dispatch_qty INT NULL",
     ]
     with engine.connect() as conn:
         for stmt in migrations:

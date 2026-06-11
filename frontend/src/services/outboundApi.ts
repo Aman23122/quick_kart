@@ -105,3 +105,39 @@ export interface ManualOrderPayload {
 
 export const createManualOrder = (payload: ManualOrderPayload) =>
   api.post<{ order_id: string; status: string; total: number }>('/api/outbound/manual', payload)
+
+// ─── Logistics Supervisor ─────────────────────────────────────────────────────
+
+export interface ConfirmedOrderLine {
+  order_line_id: string
+  variant_id: string
+  variant_name: string
+  product_name: string
+  brand_name: string
+  original_qty: number
+  allocated_qty: number
+  dispatch_qty: number | null
+  unit_price: number
+  total_price: number
+}
+
+export interface ConfirmedOrder {
+  order_id: string
+  customer_name: string
+  notes: string | null
+  total_price: number
+  created_at: string
+  confirmed_at: string
+  lines: ConfirmedOrderLine[]
+}
+
+export interface DispatchItemPayload {
+  order_line_id: string
+  dispatch_qty: number
+}
+
+export const getConfirmedOrders = () =>
+  api.get<{ total: number; data: ConfirmedOrder[] }>('/api/outbound/confirmed')
+
+export const dispatchOrder = (orderId: string, items: DispatchItemPayload[], notes?: string) =>
+  api.post(`/api/outbound/${orderId}/dispatch`, { items, notes })

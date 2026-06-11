@@ -95,4 +95,6 @@ class OrderLineItem(Base):
     tax_per = Column(Numeric(5, 2), nullable=True)
     tax_amount = Column(Numeric(10, 2), nullable=True)
     is_subscription_item = Column(Boolean, nullable=False)
+    original_qty = Column(Integer, nullable=True)
+    dispatch_qty = Column(Integer, nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())

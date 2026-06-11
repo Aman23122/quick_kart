@@ -82,6 +82,7 @@ def create_manual_order(payload: ManualOrderPayload, db: Session = Depends(get_d
             variant_id=item.variant_id,
             product_id=variant.product_id if variant else None,
             quantity=item.quantity,
+            original_qty=item.quantity,
             unit_price=item.unit_price,
             total_price=round(item.quantity * item.unit_price, 2),
             discount=0,
@@ -229,6 +230,9 @@ def approve_outbound(order_id: str, db: Session = Depends(get_db)):
             reference_id=order_id,
         )
 
+        # Preserve original requested qty before FEFO overwrites
+        if not line.original_qty:
+            line.original_qty = line.quantity
         line.quantity = fefo.qty_fulfilled
         line.total_price = round(fefo.qty_fulfilled * float(line.unit_price), 2)
         total += fefo.qty_fulfilled * float(line.unit_price)
@@ -292,6 +296,90 @@ def reject_outbound(order_id: str, db: Session = Depends(get_db)):
     return {"status": "cancelled", "order_id": order_id}
 
 
+@router.get("/confirmed")
+def get_confirmed_orders(db: Session = Depends(get_db)):
+    """Returns all confirmed (FEFO allocated, awaiting logistics dispatch) orders."""
+    orders = (
+        db.query(SalesOrder)
+        .filter(SalesOrder.order_status == "confirmed")
+        .order_by(desc(SalesOrder.created_at))
+        .all()
+    )
+
+    result = []
+    for order in orders:
+        lines = db.query(OrderLineItem).filter(OrderLineItem.order_id == order.order_id).all()
+        line_details = []
+        for line in lines:
+            variant = db.get(ProductVariant, line.variant_id)
+            product = db.get(Product, variant.product_id) if variant else None
+            brand = db.get(Brand, product.brand_id) if product and product.brand_id else None
+            line_details.append({
+                "order_line_id": line.order_line_id,
+                "variant_id": line.variant_id,
+                "variant_name": variant.variant_name if variant else line.variant_id,
+                "product_name": product.product_name if product else "",
+                "brand_name": brand.name if brand else "",
+                "original_qty": line.original_qty or line.quantity,
+                "allocated_qty": line.quantity,
+                "dispatch_qty": line.dispatch_qty,
+                "unit_price": float(line.unit_price),
+                "total_price": float(line.total_price or 0),
+            })
+        result.append({
+            "order_id": order.order_id,
+            "customer_name": order.order_instruction or "Unknown",
+            "notes": order.special_instruction,
+            "total_price": float(order.total_price or 0),
+            "created_at": format_ts(order.created_at),
+            "confirmed_at": format_ts(order.updated_at),
+            "lines": line_details,
+        })
+
+    return {"total": len(result), "data": result}
+
+
+class DispatchItem(BaseModel):
+    order_line_id: str
+    dispatch_qty: int
+
+
+class DispatchPayload(BaseModel):
+    items: List[DispatchItem]
+    notes: Optional[str] = None
+
+
+@router.post("/{order_id}/dispatch")
+def dispatch_order(order_id: str, payload: DispatchPayload, db: Session = Depends(get_db)):
+    """Logistics supervisor confirms final dispatch quantities."""
+    order = db.get(SalesOrder, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.order_status != "confirmed":
+        raise HTTPException(400, f"Cannot dispatch — current status is '{order.order_status}'")
+
+    item_map = {i.order_line_id: i.dispatch_qty for i in payload.items}
+    lines = db.query(OrderLineItem).filter(OrderLineItem.order_id == order_id).all()
+    for line in lines:
+        if line.order_line_id in item_map:
+            line.dispatch_qty = item_map[line.order_line_id]
+
+    order.order_status = "dispatched"
+    order.updated_at = now()
+    if payload.notes:
+        existing = order.special_instruction or ""
+        order.special_instruction = f"{existing}\n[Dispatch]: {payload.notes}".strip()
+
+    db.commit()
+
+    notification_service.push(
+        f"Order {order_id[:8]}… dispatched by logistics supervisor.",
+        ntype="info",
+    )
+
+    return {"status": "dispatched", "order_id": order_id}
+
+
 @router.get("/ledger")
 def get_outbound_ledger(
     db: Session = Depends(get_db),
@@ -321,10 +409,12 @@ def get_outbound_ledger(
         variant = db.get(ProductVariant, line.variant_id)
         result.append({
             "order_id": order.order_id,
-            "user_id": order.user_id,
+            "customer_name": order.order_instruction or order.user_id,
             "variant_id": line.variant_id,
             "variant_name": variant.variant_name if variant else line.variant_id,
+            "original_qty": line.original_qty or line.quantity,
             "quantity": line.quantity,
+            "dispatch_qty": line.dispatch_qty,
             "unit_price": float(line.unit_price),
             "total_price": float(line.total_price or 0),
             "order_status": order.order_status,
