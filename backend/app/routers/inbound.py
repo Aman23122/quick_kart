@@ -192,13 +192,45 @@ def get_pending_approvals(db: Session = Depends(get_db)):
 
 @router.post("/{procurement_id}/approve")
 def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
-    """Approve a pending inbound shipment — writes to inventory."""
+    """Admin approves a pending inbound shipment — moves to admin_approved for warehouse confirmation."""
     proc = db.get(Procurement, procurement_id)
     if not proc:
         raise HTTPException(404, "Procurement not found")
     if proc.status not in ("pending_approval", "rejected"):
         raise HTTPException(400, f"Cannot approve — current status is '{proc.status}'")
 
+    proc.status = "admin_approved"
+    proc.updated_at = now()
+    db.commit()
+
+    notification_service.push(
+        f"PO {proc.po_number} approved by admin — awaiting warehouse confirmation.",
+        ntype="info",
+    )
+
+    return {"status": "admin_approved", "procurement_id": procurement_id}
+
+
+class ConfirmItem(BaseModel):
+    procurement_item_id: str
+    final_qty: int
+    damaged_qty: int = 0
+
+
+class ConfirmPayload(BaseModel):
+    items: List[ConfirmItem]
+
+
+@router.post("/{procurement_id}/confirm")
+def confirm_inbound(procurement_id: str, payload: ConfirmPayload, db: Session = Depends(get_db)):
+    """Warehouse confirms receipt — records damage, writes net qty to inventory."""
+    proc = db.get(Procurement, procurement_id)
+    if not proc:
+        raise HTTPException(404, "Procurement not found")
+    if proc.status != "admin_approved":
+        raise HTTPException(400, f"Cannot confirm — current status is '{proc.status}'")
+
+    payload_map = {ci.procurement_item_id: ci for ci in payload.items}
     items = (
         db.query(ProcurementItem)
         .filter(ProcurementItem.procurement_id == procurement_id)
@@ -206,14 +238,26 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
     )
 
     to_schedule = []
+    items_added = 0
     for item in items:
+        ci = payload_map.get(item.procurement_item_id)
+        final_qty = ci.final_qty if ci else item.received_qty
+        damaged_qty = ci.damaged_qty if ci else 0
+
+        item.damaged_qty = damaged_qty
+        item.received_qty = final_qty
+
+        net_qty = final_qty - damaged_qty
+        if net_qty <= 0:
+            continue
+
         inv_id = new_id()
         cutoff = _build_dispatch_cutoff(db, item.variant_id)
         db.add(Inventory(
             inventory_id=inv_id,
             variant_id=item.variant_id,
             fulfillment_center_id=FC_ID,
-            qty=item.received_qty,
+            qty=net_qty,
             expiry_date=item.expiry_date,
             cost_price=item.unit_cost,
             sell_before_date=item.sell_before_date,
@@ -224,6 +268,7 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
         ))
         if cutoff:
             to_schedule.append((inv_id, item.variant_id, cutoff))
+        items_added += 1
 
     proc.status = "approved"
     proc.actual_received_date = now().date()
@@ -234,17 +279,57 @@ def approve_inbound(procurement_id: str, db: Session = Depends(get_db)):
     for inv_id, variant_id, cutoff in to_schedule:
         schedule_pre_dispatch_alert(db, inv_id, variant_id, cutoff)
 
-    # Run stock monitor for all approved variants
     for item in items:
         auto_resolve_if_restocked(db, item.variant_id)
         check_and_alert(db, item.variant_id)
 
     notification_service.push(
-        f"Inbound PO {proc.po_number} approved — {len(items)} item(s) added to inventory.",
+        f"PO {proc.po_number} confirmed by warehouse — {items_added} item(s) added to inventory.",
         ntype="info",
     )
 
-    return {"status": "approved", "procurement_id": procurement_id, "items_added": len(items)}
+    return {"status": "approved", "procurement_id": procurement_id, "items_added": items_added}
+
+
+@router.get("/admin-approved")
+def get_admin_approved(db: Session = Depends(get_db)):
+    """Shipments approved by admin, awaiting warehouse confirmation."""
+    rows = (
+        db.query(Procurement, ProcurementItem)
+        .join(ProcurementItem, ProcurementItem.procurement_id == Procurement.procurement_id)
+        .filter(Procurement.status == "admin_approved")
+        .order_by(desc(Procurement.updated_at))
+        .all()
+    )
+
+    result = []
+    for proc, item in rows:
+        variant = db.get(ProductVariant, item.variant_id)
+        vendor = db.get(Vendor, proc.vendor_id)
+        product = db.get(Product, variant.product_id) if variant else None
+        brand = db.get(Brand, product.brand_id) if product and product.brand_id else None
+
+        result.append({
+            "procurement_id": proc.procurement_id,
+            "procurement_item_id": item.procurement_item_id,
+            "po_number": proc.po_number,
+            "vendor_name": vendor.name if vendor else proc.vendor_id,
+            "variant_id": item.variant_id,
+            "variant_name": variant.variant_name if variant else item.variant_id,
+            "product_name": product.product_name if product else "",
+            "brand_name": brand.name if brand else "",
+            "ordered_qty": item.ordered_qty,
+            "received_qty": item.received_qty,
+            "damaged_qty": item.damaged_qty or 0,
+            "unit_cost": float(item.unit_cost),
+            "total_cost": float(item.total_cost or 0),
+            "batch_no": item.batch_no,
+            "expiry_date": str(item.expiry_date) if item.expiry_date else None,
+            "sell_before_date": str(item.sell_before_date),
+            "updated_at": format_ts(proc.updated_at),
+        })
+
+    return {"total": len(result), "data": result}
 
 
 @router.post("/{procurement_id}/reject")
@@ -253,7 +338,7 @@ def reject_inbound(procurement_id: str, db: Session = Depends(get_db)):
     proc = db.get(Procurement, procurement_id)
     if not proc:
         raise HTTPException(404, "Procurement not found")
-    if proc.status != "pending_approval":
+    if proc.status not in ("pending_approval", "admin_approved"):
         raise HTTPException(400, f"Cannot reject — current status is '{proc.status}'")
 
     proc.status = "rejected"
@@ -348,6 +433,7 @@ def get_inbound_ledger(
             "expected_receive_time": proc.expected_receive_time,
             "on_time": on_time,
             "on_time_diff_minutes": on_time_diff_minutes,
+            "damaged_qty": item.damaged_qty or 0,
             "status": proc.status,
             "created_at": format_ts(proc.created_at),
         })

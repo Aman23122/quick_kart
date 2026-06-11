@@ -88,6 +88,26 @@ const ledgerColumns: ColumnDef<InboundRow>[] = [
   { key: 'ordered_qty', header: 'Ordered', render: (r) => String(r.ordered_qty ?? '—') },
   { key: 'received_qty', header: 'Received', render: (r) => String(r.received_qty ?? '—') },
   {
+    key: 'damaged_qty',
+    header: 'Damaged',
+    render: (r) => {
+      const d = (r.damaged_qty as number) ?? 0
+      return d > 0
+        ? <span className="font-semibold text-orange-600">{d}</span>
+        : <span className="text-slate-300">—</span>
+    },
+  },
+  {
+    key: 'net_qty',
+    header: 'Net to Inventory',
+    render: (r) => {
+      if (r.status !== 'approved') return <span className="text-slate-300">—</span>
+      const recv = (r.received_qty as number) ?? 0
+      const dmg = (r.damaged_qty as number) ?? 0
+      return <span className="font-semibold text-slate-700">{recv - dmg}</span>
+    },
+  },
+  {
     key: 'variance',
     header: 'Variance',
     render: (r) => {
@@ -111,8 +131,6 @@ const ledgerColumns: ColumnDef<InboundRow>[] = [
     render: (r) =>
       r.temperature_measured != null ? `${r.temperature_measured}°` : '—',
   },
-  { key: 'batch_no', header: 'Batch' },
-  { key: 'sell_before_date', header: 'Sell Before', render: (r) => String(r.sell_before_date ?? '—') },
   {
     key: 'on_time',
     header: 'On Time?',
@@ -367,7 +385,7 @@ export default function ApprovalPage() {
                   onClick={() => approveMutation.mutate(po.procurement_id)}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
                 >
-                  <CheckCircle size={15} /> Approve & Add to Inventory
+                  <CheckCircle size={15} /> Approve
                 </button>
               </div>
             </div>
@@ -408,7 +426,8 @@ export default function ApprovalPage() {
           >
             <option value="">All Status</option>
             <option value="pending_approval">Pending Approval</option>
-            <option value="approved">Approved</option>
+            <option value="admin_approved">Admin Approved</option>
+            <option value="approved">Warehouse Confirmed</option>
             <option value="rejected">Rejected</option>
           </select>
           <div className="ml-auto">

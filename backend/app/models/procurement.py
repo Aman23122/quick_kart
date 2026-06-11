@@ -36,5 +36,6 @@ class ProcurementItem(Base):
     total_cost = Column(Numeric(14, 2), nullable=True)
     batch_no = Column(String(100), nullable=True)
     expiry_date = Column(Date, nullable=True)
+    damaged_qty = Column(Integer, nullable=False, default=0)
     created_at = Column(TIMESTAMP, server_default=func.now())
     sell_before_date = Column(Date, nullable=False)

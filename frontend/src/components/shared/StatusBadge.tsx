@@ -38,6 +38,9 @@ const statusStyles: Record<string, string> = {
   orange: 'bg-amber-100 text-amber-700 border-amber-200',
   draft: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   overridden: 'bg-slate-100 text-slate-600 border-slate-200',
+  pending_approval: 'bg-amber-100 text-amber-700 border-amber-200',
+  admin_approved: 'bg-blue-100 text-blue-700 border-blue-200',
+  approved: 'bg-emerald-100 text-emerald-700 border-emerald-200',
 }
 
 const statusLabels: Record<string, string> = {
@@ -56,6 +59,9 @@ const statusLabels: Record<string, string> = {
   temp_rejection: 'Temp Rejection',
   dispatch_blocked: 'Dispatch Blocked',
   approaching_dispatch_cutoff: 'Sales Alert',
+  pending_approval: 'Pending Approval',
+  admin_approved: 'Admin Approved',
+  approved: 'Warehouse Confirmed',
   green: 'Healthy',
   orange: 'Warning',
   red: 'Critical',

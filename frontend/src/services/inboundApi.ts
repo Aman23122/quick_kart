@@ -9,6 +9,7 @@ export interface InboundRow {
   variant_name?: string
   product_name?: string
   ordered_qty?: number
+  damaged_qty?: number
   received_qty?: number
   temperature_measured?: number
   unit_cost?: number
@@ -82,6 +83,38 @@ export const approveInbound = (procurementId: string) =>
 
 export const rejectInbound = (procurementId: string) =>
   api.post(`/api/inbound/${procurementId}/reject`)
+
+export interface AdminApprovedItem {
+  procurement_id: string
+  procurement_item_id: string
+  po_number: string
+  vendor_name: string
+  variant_id: string
+  variant_name: string
+  product_name: string
+  brand_name: string
+  ordered_qty: number
+  received_qty: number
+  damaged_qty: number
+  unit_cost: number
+  total_cost: number
+  batch_no: string | null
+  expiry_date: string | null
+  sell_before_date: string
+  updated_at: string
+}
+
+export const getAdminApproved = () =>
+  api.get<{ total: number; data: AdminApprovedItem[] }>('/api/inbound/admin-approved')
+
+export interface ConfirmItemPayload {
+  procurement_item_id: string
+  final_qty: number
+  damaged_qty: number
+}
+
+export const confirmInbound = (procurementId: string, items: ConfirmItemPayload[]) =>
+  api.post(`/api/inbound/${procurementId}/confirm`, { items })
 
 export const getInboundLedger = (params: InboundLedgerParams) =>
   api.get<{ total: number; data: InboundRow[] }>('/api/inbound/ledger', { params })

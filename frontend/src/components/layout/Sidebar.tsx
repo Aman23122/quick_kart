@@ -19,7 +19,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/useAuthStore'
-import { getPendingApprovals } from '@/services/inboundApi'
+import { getPendingApprovals, getAdminApproved } from '@/services/inboundApi'
 
 const baseNavItems = [
   { to: '/super-admin', label: 'Super Admin Panel', icon: Shield, exact: true, roles: ['super_admin'] as string[] | null },
@@ -51,6 +51,14 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
     staleTime: 10000,
   })
   const pendingCount = pendingData?.total ?? 0
+
+  const { data: adminApprovedData } = useQuery({
+    queryKey: ['admin-approved'],
+    queryFn: () => getAdminApproved().then((r) => r.data),
+    refetchInterval: 15000,
+    staleTime: 10000,
+  })
+  const inboundCount = adminApprovedData?.total ?? 0
 
   const navItems = baseNavItems.filter(
     (item) => item.roles === null || (user?.role && item.roles.includes(user.role))
@@ -120,6 +128,9 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
                   {to === '/approval' && pendingCount > 0 && !expanded && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" />
                   )}
+                  {to === '/inbound' && inboundCount > 0 && !expanded && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-400" style={{ background: 'var(--brand-400)' }} />
+                  )}
                 </div>
                 {expanded && (
                   <span className="text-sm font-medium whitespace-nowrap flex-1">{label}</span>
@@ -127,6 +138,11 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
                 {expanded && to === '/approval' && pendingCount > 0 && (
                   <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-400 text-white leading-none">
                     {pendingCount}
+                  </span>
+                )}
+                {expanded && to === '/inbound' && inboundCount > 0 && (
+                  <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full text-white leading-none" style={{ background: 'var(--brand-500)' }}>
+                    {inboundCount}
                   </span>
                 )}
               </NavLink>
