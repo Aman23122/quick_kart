@@ -60,7 +60,7 @@ export default function CreateUserPage() {
         <div
           className="px-6 py-4 flex items-center gap-3 rounded-t-[1rem] overflow-hidden"
           style={{
-            background: 'var(--brand-dot-bg)',
+            background: 'var(--brand-card-bg)',
           }}
         >
           <button
