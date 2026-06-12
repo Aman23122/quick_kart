@@ -60,8 +60,7 @@ export default function CreateUserPage() {
         <div
           className="px-6 py-4 flex items-center gap-3 rounded-t-[1rem] overflow-hidden"
           style={{
-            background:
-              'radial-gradient(circle, rgba(255,255,255,0.13) 1px, transparent 1px) 0 0 / 18px 18px, linear-gradient(135deg, var(--brand-500), var(--brand-600))',
+            background: 'var(--brand-dot-bg)',
           }}
         >
           <button

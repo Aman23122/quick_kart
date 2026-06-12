@@ -86,7 +86,7 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
         'flex flex-col h-full transition-all duration-300 overflow-hidden',
         expanded ? 'w-[220px]' : 'w-[64px]'
       )}
-      style={{ background: 'var(--brand-800)' }}
+      style={{ background: "var(--brand-dot-bg)" }}
     >
       {/* Brand */}
       <div
@@ -95,7 +95,7 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
       >
         <div
           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center shadow-lg"
-          style={{ background: 'var(--brand-600)' }}
+          style={{ background: 'var(--brand-800)' }}
         >
           <Zap size={16} className="text-white" />
         </div>
@@ -128,7 +128,7 @@ export default function Sidebar({ expanded }: { expanded: boolean }) {
                 )}
                 style={
                   isActive
-                    ? { background: 'var(--brand-600)' }
+                    ? { background: 'var(--brand-800)' }
                     : isAdminPanel
                     ? { color: 'var(--brand-300)', borderColor: 'rgba(218,236,223,0.2)' }
                     : { color: 'rgba(218,236,223,0.55)' }

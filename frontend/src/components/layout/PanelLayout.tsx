@@ -22,7 +22,7 @@ export default function PanelLayout({ portalLabel, PortalIcon }: Props) {
     <div className="min-h-screen bg-brand-page">
       <header
         className="h-14 flex items-center justify-between px-6 shadow-md"
-        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px) 0 0 / 18px 18px, var(--brand-600)" }}
+        style={{ background: "var(--brand-dot-bg)" }}
       >
         <div className="flex items-center gap-3">
           <div

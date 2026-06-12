@@ -33,6 +33,11 @@
     --brand-600: #3d8b5e;
     --brand-700: #2a6b46;
     --brand-800: #1e5235;
+
+    /* Global dot-gradient surface — change here, updates everywhere */
+    --brand-dot-size: 1.5px;
+    --brand-gradient: linear-gradient(180deg, var(--brand-600), var(--brand-700));
+    --brand-dot-bg: radial-gradient(circle, rgba(255,255,255,0.1) var(--brand-dot-size), transparent 1px) 0 0 / 18px 18px, var(--brand-gradient);
   }
 
   * { @apply border-border box-border; }
